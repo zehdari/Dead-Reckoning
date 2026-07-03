@@ -1,0 +1,5 @@
+__pycache__/
+.agents/
+.codex/
+node_modules/
+*.log
