@@ -311,18 +311,24 @@ function SceneInspector() {
         <details className="adv">
           <summary>Bottom lines (tag snap points)</summary>
           <div className="lines-grid">
+            <span />
+            <span className="muted">count</span>
+            <span className="muted">spacing</span>
+            <span className="muted">thickness</span>
             <label className="check">
               <input type="checkbox" checked={lines.shortShow} onChange={(e) => st().setLines({ shortShow: e.target.checked })} />
               across (∥ short side)
             </label>
             <NumberField value={lines.shortCount} decimals={0} step={1} width={52} onCommit={(v) => st().setLines({ shortCount: Math.max(0, Math.round(v)) })} />
             <NumberField value={lines.shortSpacing} decimals={4} step={0.01} width={80} suffix="m" onCommit={(v) => st().setLines({ shortSpacing: Math.max(0.1, v) })} />
+            <NumberField value={lines.shortThickness} decimals={3} step={0.01} width={64} suffix="m" title="Stripe thickness of the across lines" onCommit={(v) => st().setLines({ shortThickness: Math.max(0.02, v) })} />
             <label className="check">
               <input type="checkbox" checked={lines.longShow} onChange={(e) => st().setLines({ longShow: e.target.checked })} />
               along (∥ long side)
             </label>
             <NumberField value={lines.longCount} decimals={0} step={1} width={52} onCommit={(v) => st().setLines({ longCount: Math.max(0, Math.round(v)) })} />
             <NumberField value={lines.longSpacing} decimals={4} step={0.01} width={80} suffix="m" onCommit={(v) => st().setLines({ longSpacing: Math.max(0.1, v) })} />
+            <NumberField value={lines.longThickness} decimals={3} step={0.01} width={64} suffix="m" title="Stripe thickness of the along lines" onCommit={(v) => st().setLines({ longThickness: Math.max(0.02, v) })} />
           </div>
         </details>
       </Card>

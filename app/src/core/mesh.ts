@@ -42,6 +42,21 @@ export function hasTexture(entry: MeshEntry | undefined): boolean {
   return !!entry && (!!entry.tex || !!entry.texByClass)
 }
 
+/** Footprint bbox + extents for a mesh: a centered square when a top-down texture
+ *  is used (icons stay undistorted), else the model XY bounding box. */
+export function meshFootprint(entry: MeshEntry): {
+  bbox: [number, number, number, number]
+  length: number
+  width: number
+} {
+  if (hasTexture(entry) && entry.texSquare) {
+    const s = entry.texSquare
+    return { bbox: [-s, s, -s, s], length: 2 * s, width: 2 * s }
+  }
+  const [x0, x1, y0, y1] = entry.bbox
+  return { bbox: [x0, x1, y0, y1], length: x1 - x0, width: y1 - y0 }
+}
+
 /**
  * Priority order: alias table / exact / strip trailing digits
  * (bin_vinyl1 -> bin_vinyl) / unique `_<name>` suffix (pill -> table_pill).

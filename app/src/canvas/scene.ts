@@ -9,7 +9,6 @@
  */
 import { Application, Assets, Container, Graphics, Sprite, Texture } from 'pixi.js'
 import {
-  LINE_THICKNESS_M,
   MAP,
   POOL_LENGTH_M,
   POOL_WIDTH_M,
@@ -612,14 +611,17 @@ export class PoolScene {
   private drawLanes(s: State): void {
     const g = this.laneLayer
     g.clear()
-    const t = LINE_THICKNESS_M
     const ln = s.lines
-    if (ln.shortShow)
+    if (ln.shortShow) {
+      const t = ln.shortThickness
       for (const x of centeredPositions(POOL_LENGTH_M, ln.shortCount, ln.shortSpacing))
         g.rect(x - t / 2, 0, t, POOL_WIDTH_M)
-    if (ln.longShow)
+    }
+    if (ln.longShow) {
+      const t = ln.longThickness
       for (const y of centeredPositions(POOL_WIDTH_M, ln.longCount, ln.longSpacing))
         g.rect(0, y - t / 2, POOL_LENGTH_M, t)
+    }
     g.fill({ color: this.pal.lane, alpha: this.pal.laneAlpha })
   }
 

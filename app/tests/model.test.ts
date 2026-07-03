@@ -11,7 +11,7 @@ import {
   subtreeOrder,
   uniqueName,
 } from '../src/core/model'
-import { resolveMeshDir } from '../src/core/mesh'
+import { TopdownManifest, resolveMeshDir } from '../src/core/mesh'
 import { applySidecar, buildSidecar, defaultLines } from '../src/core/sidecar'
 
 function scene(): { objects: Objects; order: string[] } {
@@ -161,12 +161,14 @@ describe('sidecar', () => {
     )
 
     const fresh = scene()
-    const applied = applySidecar(json, fresh.objects, ['gate', 'bin'])
+    const manifest: TopdownManifest = { gate: { bbox: [0, 2, -1, 1] }, bin: { bbox: [0, 1, 0, 1] } }
+    const applied = applySidecar(json, fresh.objects, manifest)
     expect(applied.objects.a.locked).toBe(true)
     expect(applied.objects.a.hidden).toBe(true)
     expect(applied.objects.a.color).toBe('#123456')
     expect(applied.objects.a.mesh).toBe('gate')
-    expect(applied.objects.a.bbox).toEqual([0, 1, -1, 1])
+    // manifest bbox wins over the sidecar's stale img_bbox
+    expect(applied.objects.a.bbox).toEqual([0, 2, -1, 1])
     expect(applied.tag).toEqual(tag)
     expect(applied.lines.shortCount).toBe(15)
     expect(applied.lines.showGrid).toBe(true)
@@ -179,7 +181,7 @@ describe('sidecar', () => {
       apriltag: null,
       lines: {},
     })
-    const applied = applySidecar(json, objects, ['bin'])
+    const applied = applySidecar(json, objects, { bin: { bbox: [0, 1, 0, 1] } })
     expect(applied.objects.a.mesh).toBe('bin')
     expect(applied.tag).toBeNull()
   })

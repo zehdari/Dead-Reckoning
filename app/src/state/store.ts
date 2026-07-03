@@ -28,8 +28,8 @@ import {
   uniqueName,
 } from '../core/model'
 import { DEPRECATED_OBJECTS, emptyConfigText, loadConfig, saveConfig } from '../core/config'
-import { LinesConfig, applySidecar, buildSidecar, defaultLines, sidecarPath } from '../core/sidecar'
-import { MeshEntry, TopdownManifest, hasTexture, resolveMeshDir } from '../core/mesh'
+import { LinesConfig, applySidecar, buildSidecar, defaultLines } from '../core/sidecar'
+import { TopdownManifest, meshFootprint, resolveMeshDir } from '../core/mesh'
 import * as api from '../api'
 
 export interface Session {
@@ -178,21 +178,6 @@ function initialTheme(): Theme {
   } catch {
     return 'light'
   }
-}
-
-/** Footprint bbox + extents for a mesh: a centered square when a top-down texture
- *  is used (icons stay undistorted), else the model XY bounding box. */
-function meshFootprint(entry: MeshEntry): {
-  bbox: [number, number, number, number]
-  length: number
-  width: number
-} {
-  if (hasTexture(entry) && entry.texSquare) {
-    const s = entry.texSquare
-    return { bbox: [-s, s, -s, s], length: 2 * s, width: 2 * s }
-  }
-  const [x0, x1, y0, y1] = entry.bbox
-  return { bbox: [x0, x1, y0, y1], length: x1 - x0, width: y1 - y0 }
 }
 
 function placeholderObjects(tag: Tag): { objects: Objects; order: string[] } {
@@ -774,13 +759,15 @@ export const useStore = create<State>()((set, get) => {
         let lines = defaultLines()
         let finalObjects = objects
         try {
-          const sidecarJson = await api.readFile(sidecarPath(path))
-          const applied = applySidecar(sidecarJson, objects, Object.keys(get().manifest))
-          finalObjects = applied.objects
-          if (applied.tag) tag = applied.tag
-          lines = { ...lines, ...applied.lines }
+          const vizJson = await api.readViz(path)
+          if (vizJson) {
+            const applied = applySidecar(vizJson, objects, get().manifest)
+            finalObjects = applied.objects
+            if (applied.tag) tag = applied.tag
+            lines = { ...lines, ...applied.lines }
+          }
         } catch {
-          /* no sidecar — fine */
+          /* no viz state — fine */
         }
         commit(finalObjects, order, {
           tag,
@@ -814,12 +801,9 @@ export const useStore = create<State>()((set, get) => {
         })
         markClean()
         try {
-          await api.writeFile(
-            sidecarPath(path),
-            buildSidecar(s.objects, s.order, s.tag, s.lines, s.home),
-          )
+          await api.writeViz(path, buildSidecar(s.objects, s.order, s.tag, s.lines, s.home))
         } catch {
-          /* sidecar is best-effort; never block a config save on it */
+          /* viz state is best-effort; never block a config save on it */
         }
         get().say(`Saved ${s.order.length} objects to ${path.split('/').pop()}.`)
       } catch (e) {

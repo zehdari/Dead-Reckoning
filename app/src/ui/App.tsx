@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { isDesktop } from '../api'
 import { PoolCanvas } from '../canvas/PoolCanvas'
 import { sceneHandle } from '../canvas/scene'
 import { mapToWorld } from '../core/math'
@@ -123,6 +124,33 @@ export function App() {
     }
     window.addEventListener('beforeunload', onBeforeUnload)
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [])
+
+  // desktop: the window X bypasses beforeunload, so guard the close event
+  useEffect(() => {
+    if (!isDesktop) return
+    let unlisten: (() => void) | undefined
+    let disposed = false
+    void (async () => {
+      const [{ getCurrentWindow }, { ask }] = await Promise.all([
+        import('@tauri-apps/api/window'),
+        import('@tauri-apps/plugin-dialog'),
+      ])
+      const un = await getCurrentWindow().onCloseRequested(async (e) => {
+        if (!useStore.getState().dirty) return
+        const leave = await ask('You have unsaved changes. Quit anyway?', {
+          title: 'Dead Reckoning',
+          kind: 'warning',
+        })
+        if (!leave) e.preventDefault()
+      })
+      if (disposed) un()
+      else unlisten = un
+    })()
+    return () => {
+      disposed = true
+      unlisten?.()
+    }
   }, [])
 
   useEffect(() => {

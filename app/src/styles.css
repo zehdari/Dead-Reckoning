@@ -847,9 +847,14 @@ button.col-flag.hide.on {
 
 .lines-grid {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto auto auto;
   gap: 4px 6px;
   align-items: center;
+}
+
+.lines-grid > span.muted {
+  font-size: 10px;
+  text-align: center;
 }
 
 .readout {

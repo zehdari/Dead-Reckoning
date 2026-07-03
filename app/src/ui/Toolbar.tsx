@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import * as api from '../api'
 import { sceneHandle } from '../canvas/scene'
 import { useStore } from '../state/store'
 import { PathDialog } from './common'
@@ -106,13 +107,35 @@ export function Toolbar() {
     if (configPath) void st().saveToPath(configPath)
     else saveAs()
   }
-  const saveAs = () =>
+  // desktop: native file dialogs; browser: the in-app path prompt
+  const doLoad = () => {
+    if (api.isDesktop) {
+      void api.pickLoadPath(configPath ?? fallbackDir).then((p) => {
+        if (p) void st().loadFromPath(p)
+      })
+      return
+    }
+    setDialog({
+      title: 'Load mapping config',
+      action: 'Load',
+      initial: configPath ?? `${fallbackDir}/config.yaml`,
+      run: (p) => void st().loadFromPath(p),
+    })
+  }
+  const saveAs = () => {
+    if (api.isDesktop) {
+      void api.pickSavePath(configPath ?? `${fallbackDir}/config.yaml`).then((p) => {
+        if (p) void st().saveToPath(p)
+      })
+      return
+    }
     setDialog({
       title: 'Save mapping config as',
       action: 'Save',
       initial: configPath ?? `${fallbackDir}/config.yaml`,
       run: (p) => void st().saveToPath(p),
     })
+  }
 
   return (
     <div className="toolbar">
@@ -123,16 +146,7 @@ export function Toolbar() {
       <Menu
         label="File"
         items={[
-          {
-            label: 'Load…',
-            onClick: () =>
-              setDialog({
-                title: 'Load mapping config',
-                action: 'Load',
-                initial: configPath ?? `${fallbackDir}/config.yaml`,
-                run: (p) => void st().loadFromPath(p),
-              }),
-          },
+          { label: 'Load…', onClick: doLoad },
           {
             label: (
               <>

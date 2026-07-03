@@ -8,7 +8,7 @@ Built as a web app (SPEC §9, option 2): **PixiJS (WebGL)** retained-GPU canvas 
 **React/zustand** UI + **eemeli `yaml`** for the comment-preserving config round-trip, served
 by Vite with a tiny localhost file API for config/sidecar/CSV I/O.
 
-## Run
+## Run (browser dev server)
 
 ```sh
 nvm use          # needs Node ≥ 18 (a .nvmrc pinning 22 is provided)
@@ -18,7 +18,46 @@ npm run dev      # → http://localhost:5173
 
 The default config
 (`~/osu-uwrt/release/src/riptide_perception/riptide_mapping/config/config.yaml`)
-auto-loads on startup when present, together with its `<config>.dr_viz.json` sidecar.
+auto-loads on startup when present, together with its viz state.
+
+## Run (desktop app — Tauri)
+
+The same frontend ships as a native desktop app via [Tauri](https://tauri.app) 2
+(`src-tauri/`). Sprites and the UI are baked into the binary; `config.yaml` stays an
+external file opened/saved through native file dialogs.
+
+One-time setup — Rust plus, on Ubuntu, the WebKitGTK stack:
+
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh   # any platform
+# Ubuntu only:
+sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file \
+                 libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+```
+
+(macOS needs only the Xcode command-line tools; Windows needs the VS C++ Build Tools —
+WebView2 is preinstalled on Windows 10/11. Same commands below on all three.)
+
+```sh
+npm run tauri:dev     # dev app (starts vite itself; hot-reloads the frontend)
+npm run tauri:build   # release bundles → src-tauri/target/release/bundle/
+                      #   Ubuntu: .deb / .rpm / .AppImage · macOS: .app / .dmg · Windows: .msi / .exe
+```
+
+How the desktop runtime differs from the browser (all switching lives in `src/api.ts`,
+which picks Tauri commands vs the dev-server HTTP API at runtime):
+
+- **File dialogs are native** (`tauri-plugin-dialog`); the browser build keeps the
+  in-app path prompt.
+- **File access** goes through three tiny Rust commands (`src-tauri/src/lib.rs`),
+  restricted to `$HOME` and `/tmp` — the same policy as the dev server's API.
+- **Settings live with the app.** UI settings (theme, panel layout, checkboxes) persist
+  in the WebView's localStorage under the app identifier; per-config viz state
+  (hidden/locked items, colors, footprints, tag placement, lines) is stored in the
+  app-data dir (`~/.local/share/edu.osu.uwrt.deadreckoning/state/` on Linux) instead of
+  a sidecar file next to the config — nothing is written into the external config's
+  directory. Legacy `<config>.dr_viz.json` sidecars are still read as a fallback.
+- **Closing with unsaved changes** asks for confirmation via a native dialog.
 
 ## Verify
 
@@ -85,14 +124,16 @@ that share a parent (world-preserving even across different parents internally) 
 gate sides, or compass/hammer/buoy/sos around the table — and **Swap class** exchanges the
 `class` field (bin vinyl fire/blood).
 
-## Tool-only state (viz sidecar)
+## Tool-only state (viz state)
 
 Lock/hide, colors, footprints, mesh assignment, the AprilTag placement and the line layout are
-persisted in `<config>.dr_viz.json` next to the config (format-compatible with the PySide6
-prototype). It never blocks a config save. On config load, every object whose parent ≠ map
-starts **locked** (immovable *and* click-through — e.g. the table never swallows clicks meant
-for the small props on it); the sidecar then overrides with saved choices. Locked/hidden
-objects remain selectable and editable via the objects list.
+persisted per config, in the PySide6-prototype-compatible sidecar format: the desktop app keeps
+it in its app-data dir (keyed by config path; legacy `<config>.dr_viz.json` sidecars are read
+as a fallback), the browser build writes `<config>.dr_viz.json` next to the config. It never
+blocks a config save. On config load, every object whose parent ≠ map starts **locked**
+(immovable *and* click-through — e.g. the table never swallows clicks meant for the small
+props on it); the saved viz state then overrides with saved choices. Locked/hidden objects
+remain selectable and editable via the objects list.
 
 ## UI
 
@@ -109,10 +150,10 @@ wheel = zoom about cursor (zoom-out clamps at pool ∪ furthest object) · doubl
 object · `F` fit · arrows = nudge 1 cm (⇧ 10 cm) · `Q`/`E` = rotate 1° (⇧ 15°) · `L` lock ·
 `H` hide · `Del` delete · `Esc` deselect/cancel · `[` / `]` toggle the side panels.
 
-## Packaging (SPEC §2.4 — "eventually")
+## Packaging (SPEC §2.4)
 
-The renderer/UI is plain web; the only native dependency is the file API
-(`server/fsApi.ts`, ~60 lines). To ship desktop binaries, wrap `dist/` in **Tauri** and remap
-the four calls in `src/api.ts` (env/read/write) to Tauri's `fs`/`path` plugins — no other code
-changes. Until then, `npm run dev` (or `vite preview` after a build) serves the tool locally
-with full file access.
+Done via Tauri — see *Run (desktop app)* above. The renderer/UI is plain web; the only
+native surface is `src/api.ts` (env/read/write/viz-state/dialogs), backed by
+`server/fsApi.ts` in the browser and `src-tauri/src/lib.rs` on desktop. App icons are
+generated from a single source PNG with `npx tauri icon` (committed under
+`src-tauri/icons/`).
