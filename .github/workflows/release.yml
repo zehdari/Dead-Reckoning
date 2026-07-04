@@ -67,7 +67,8 @@ jobs:
           releaseName: 'Dead Reckoning ${{ github.ref_name }}'
           releaseBody: >
             Linux: `sudo apt install ./DeadReckoning_*.deb` ·
-            macOS: open the .dmg (unsigned — right-click the app, Open) ·
+            macOS: open the .dmg, drag to Applications, then run
+            `xattr -cr /Applications/DeadReckoning.app` (unsigned build) ·
             Windows: run the .exe installer.
           releaseDraft: true
           args: ${{ matrix.args }}

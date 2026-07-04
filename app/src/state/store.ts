@@ -191,25 +191,6 @@ function initialTheme(): Theme {
   }
 }
 
-function placeholderObjects(tag: Tag): { objects: Objects; order: string[] } {
-  const cx = POOL_LENGTH_M / 2
-  const cy = POOL_WIDTH_M / 2
-  const spots: [string, number, number, Partial<PropObj>][] = [
-    ['gate', cx - 13, cy, { length: 0.3, width: 3.0 }],
-    ['buoy', cx - 6, cy + 1.5, { length: 0.4, width: 0.4 }],
-    ['bin', cx + 2, cy - 3, { length: 1.2, width: 0.9 }],
-    ['torpedo', cx + 10, cy + 2, { length: 1.0, width: 1.0 }],
-  ]
-  const objects: Objects = {}
-  const order: string[] = []
-  for (const [name, wx, wy, extra] of spots) {
-    const [mx, my, myaw] = worldToMap(wx, wy, 0, tag)
-    objects[name] = makeProp(name, { x: mx, y: my, yaw: myaw, ...extra })
-    order.push(name)
-  }
-  return { objects, order }
-}
-
 export const useStore = create<State>()((set, get) => {
   /** apply an objects/order change + recompute derived map poses + mark dirty */
   const commit = (
@@ -738,7 +719,7 @@ export const useStore = create<State>()((set, get) => {
         /* server API unavailable (static build) — keep going */
       }
       // Reopen the config the user last had open. On a fresh install nothing is
-      // remembered, so we open no config.yaml and start with placeholders.
+      // remembered, so we open no config.yaml and start empty.
       const last = LS.get(LAST_CONFIG, '')
       if (last) {
         try {
@@ -749,16 +730,13 @@ export const useStore = create<State>()((set, get) => {
           LS.remove(LAST_CONFIG)
         }
       }
-      const tag = get().tag
-      const { objects, order } = placeholderObjects(tag)
-      commit(objects, order, {}, false)
-      get().autoAssignMeshes()
+      commit({}, [], {}, false)
       set({ dirty: false, past: [], future: [] })
       markClean()
       get().say(
         last
-          ? 'Last config could not be opened — starting with placeholder objects.'
-          : 'Starting with placeholder objects. Open a config to begin.',
+          ? 'Last config could not be opened — starting empty.'
+          : 'Open a config to begin.',
       )
     },
 
