@@ -229,7 +229,7 @@
         0.0625
       ],
       "locked": true,
-      "hidden": false,
+      "hidden": true,
       "mesh": "bin_magnet"
     },
     "magnet_target2": {
@@ -245,7 +245,7 @@
         0.0625
       ],
       "locked": true,
-      "hidden": false,
+      "hidden": true,
       "mesh": "bin_magnet"
     },
     "magnet1": {

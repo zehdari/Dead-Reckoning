@@ -168,7 +168,18 @@ const LS = {
       /* private mode / SSR */
     }
   },
+  remove(key: string): void {
+    try {
+      localStorage.removeItem(`dr.${key}`)
+    } catch {
+      /* private mode / SSR */
+    }
+  },
 }
+
+/** localStorage key holding the last config the user opened/saved, so the app
+ *  reopens it on next launch. Unset on a fresh install → no config is opened. */
+const LAST_CONFIG = 'lastConfig'
 
 function initialTheme(): Theme {
   const saved = LS.get('theme', '')
@@ -720,24 +731,35 @@ export const useStore = create<State>()((set, get) => {
       // Inlined by the `define` in vite.config.ts — a runtime fetch of
       // /topdown/manifest.json fails in the packaged Tauri (WebKitGTK) build.
       set({ manifest: __TOPDOWN_MANIFEST__ })
-      let env: api.Env | null = null
       try {
-        env = await api.env()
+        const env = await api.env()
         set({ home: env.home })
       } catch {
         /* server API unavailable (static build) — keep going */
       }
-      if (env?.defaultConfigExists) {
-        await get().loadFromPath(env.defaultConfigPath)
-      } else {
-        const tag = get().tag
-        const { objects, order } = placeholderObjects(tag)
-        commit(objects, order, {}, false)
-        get().autoAssignMeshes()
-        set({ dirty: false, past: [], future: [] })
-        markClean()
-        get().say('No config found — starting with placeholder objects.')
+      // Reopen the config the user last had open. On a fresh install nothing is
+      // remembered, so we open no config.yaml and start with placeholders.
+      const last = LS.get(LAST_CONFIG, '')
+      if (last) {
+        try {
+          await get().loadFromPath(last)
+          return
+        } catch {
+          // the remembered file is gone/unreadable — forget it and fall through
+          LS.remove(LAST_CONFIG)
+        }
       }
+      const tag = get().tag
+      const { objects, order } = placeholderObjects(tag)
+      commit(objects, order, {}, false)
+      get().autoAssignMeshes()
+      set({ dirty: false, past: [], future: [] })
+      markClean()
+      get().say(
+        last
+          ? 'Last config could not be opened — starting with placeholder objects.'
+          : 'Starting with placeholder objects. Open a config to begin.',
+      )
     },
 
     loadFromPath: async (path) => {
@@ -774,6 +796,7 @@ export const useStore = create<State>()((set, get) => {
         get().autoAssignMeshes()
         set({ dirty: false, past: [], future: [] })
         markClean()
+        LS.set(LAST_CONFIG, path)
         get().say(`Loaded ${order.length} objects from ${ns} (${path.split('/').pop()}).`)
       } catch (e) {
         get().say(`Load failed: ${e instanceof Error ? e.message : e}`, 'error')
@@ -794,6 +817,7 @@ export const useStore = create<State>()((set, get) => {
           dirty: false,
         })
         markClean()
+        LS.set(LAST_CONFIG, path)
         try {
           await api.writeViz(path, buildSidecar(s.objects, s.order, s.tag, s.lines, s.home))
         } catch {
