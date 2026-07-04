@@ -632,15 +632,57 @@ export class PoolScene {
     const g = this.laneLayer
     g.clear()
     const ln = s.lines
+    // T ends are built from non-overlapping rects (bar + inset stem) so the
+    // translucent fill doesn't double-blend where they meet
     if (ln.shortShow) {
       const t = ln.shortThickness
-      for (const x of centeredPositions(POOL_LENGTH_M, ln.shortCount, ln.shortSpacing))
-        g.rect(x - t / 2, 0, t, POOL_WIDTH_M)
+      const L = Math.min(ln.shortLength, POOL_WIDTH_M)
+      const y0 = (POOL_WIDTH_M - L) / 2
+      for (const x of centeredPositions(POOL_LENGTH_M, ln.shortCount, ln.shortSpacing)) {
+        if (ln.teeShow) {
+          const b = Math.max(ln.shortTeeLength, t)
+          g.rect(x - b / 2, y0, b, t)
+          g.rect(x - b / 2, y0 + L - t, b, t)
+          g.rect(x - t / 2, y0 + t, t, Math.max(L - 2 * t, 0))
+        } else g.rect(x - t / 2, y0, t, L)
+      }
     }
     if (ln.longShow) {
       const t = ln.longThickness
-      for (const y of centeredPositions(POOL_WIDTH_M, ln.longCount, ln.longSpacing))
-        g.rect(0, y - t / 2, POOL_LENGTH_M, t)
+      const L = Math.min(ln.longLength, POOL_LENGTH_M)
+      const x0 = (POOL_LENGTH_M - L) / 2
+      // the across lines cut through the along lines: drop a window around each
+      // crossing so the cut ends sit an air gap away from the across stripe
+      const shortL = Math.min(ln.shortLength, POOL_WIDTH_M)
+      const sy0 = (POOL_WIDTH_M - shortL) / 2
+      const cutHalf = ln.shortThickness / 2 + Math.max(ln.crossGap, 0)
+      const xs = ln.shortShow
+        ? centeredPositions(POOL_LENGTH_M, ln.shortCount, ln.shortSpacing)
+        : []
+      for (const y of centeredPositions(POOL_WIDTH_M, ln.longCount, ln.longSpacing)) {
+        let s0 = x0
+        let s1 = x0 + L
+        if (ln.teeShow) {
+          const b = Math.max(ln.longTeeLength, t)
+          g.rect(x0, y - b / 2, t, b)
+          g.rect(x0 + L - t, y - b / 2, t, b)
+          s0 += t
+          s1 -= t
+        }
+        const cuts = y + t / 2 > sy0 && y - t / 2 < sy0 + shortL ? xs : []
+        let segs: Array<[number, number]> = s1 > s0 ? [[s0, s1]] : []
+        for (const x of cuts) {
+          const lo = x - cutHalf
+          const hi = x + cutHalf
+          const next: Array<[number, number]> = []
+          for (const [a, b] of segs) {
+            if (lo > a) next.push([a, Math.min(lo, b)])
+            if (hi < b) next.push([Math.max(hi, a), b])
+          }
+          segs = next
+        }
+        for (const [a, b] of segs) g.rect(a, y - t / 2, b - a, t)
+      }
     }
     g.fill({ color: this.pal.lane, alpha: this.pal.laneAlpha })
   }

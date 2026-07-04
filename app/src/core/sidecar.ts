@@ -6,7 +6,7 @@
  * (image_path points at its render cache; we additionally store the mesh
  * name). Never blocks a config save if it fails.
  */
-import { LINE_THICKNESS_M, OriginMode, Tag } from './math'
+import { LINE_THICKNESS_M, OriginMode, POOL_LENGTH_M, POOL_WIDTH_M, Tag } from './math'
 import defaultVizData from './defaultViz.json'
 import { TopdownManifest, meshFootprint } from './mesh'
 import { Objects, PropObj } from './model'
@@ -17,11 +17,23 @@ export interface LinesConfig {
   shortSpacing: number
   /** stripe thickness of the "across" (short-side-parallel) lines, m */
   shortThickness: number
+  /** run length of the "across" lines, m (centered on the pool width) */
+  shortLength: number
+  /** T crossbar length at each end of an "across" line, m */
+  shortTeeLength: number
   longShow: boolean
   longCount: number
   longSpacing: number
   /** stripe thickness of the "along" (long-side-parallel) lines, m */
   longThickness: number
+  /** run length of the "along" lines, m (centered on the pool length) */
+  longLength: number
+  /** T crossbar length at each end of an "along" line, m */
+  longTeeLength: number
+  /** draw T ends (crossbar same thickness as the line) */
+  teeShow: boolean
+  /** air gap between a cut "along" line end and the crossing "across" line, m */
+  crossGap: number
   showGrid: boolean
   showChildren: boolean
 }
@@ -41,10 +53,16 @@ export interface SidecarData {
     short_count: number
     short_spacing: number
     short_thickness?: number
+    short_length?: number
+    short_tee_length?: number
     long_show: boolean
     long_count: number
     long_spacing: number
     long_thickness?: number
+    long_length?: number
+    long_tee_length?: number
+    tee_show?: boolean
+    cross_gap?: number
     show_grid: boolean
     show_children: boolean
   }
@@ -105,10 +123,16 @@ export function buildSidecar(
       short_count: lines.shortCount,
       short_spacing: lines.shortSpacing,
       short_thickness: lines.shortThickness,
+      short_length: lines.shortLength,
+      short_tee_length: lines.shortTeeLength,
       long_show: lines.longShow,
       long_count: lines.longCount,
       long_spacing: lines.longSpacing,
       long_thickness: lines.longThickness,
+      long_length: lines.longLength,
+      long_tee_length: lines.longTeeLength,
+      tee_show: lines.teeShow,
+      cross_gap: lines.crossGap,
       show_grid: lines.showGrid,
       show_children: lines.showChildren,
     },
@@ -179,10 +203,16 @@ export function applySidecar(
         ...(ln.short_count !== undefined && { shortCount: ln.short_count }),
         ...(ln.short_spacing !== undefined && { shortSpacing: ln.short_spacing }),
         ...(typeof ln.short_thickness === 'number' && { shortThickness: ln.short_thickness }),
+        ...(typeof ln.short_length === 'number' && { shortLength: ln.short_length }),
+        ...(typeof ln.short_tee_length === 'number' && { shortTeeLength: ln.short_tee_length }),
         ...(ln.long_show !== undefined && { longShow: !!ln.long_show }),
         ...(ln.long_count !== undefined && { longCount: ln.long_count }),
         ...(ln.long_spacing !== undefined && { longSpacing: ln.long_spacing }),
         ...(typeof ln.long_thickness === 'number' && { longThickness: ln.long_thickness }),
+        ...(typeof ln.long_length === 'number' && { longLength: ln.long_length }),
+        ...(typeof ln.long_tee_length === 'number' && { longTeeLength: ln.long_tee_length }),
+        ...(ln.tee_show !== undefined && { teeShow: !!ln.tee_show }),
+        ...(typeof ln.cross_gap === 'number' && { crossGap: ln.cross_gap }),
         ...(ln.show_grid !== undefined && { showGrid: !!ln.show_grid }),
         ...(ln.show_children !== undefined && { showChildren: !!ln.show_children }),
       }
@@ -203,10 +233,17 @@ export function defaultLines(): LinesConfig {
     shortCount: 17,
     shortSpacing: 2.7432,
     shortThickness: LINE_THICKNESS_M,
+    // FINA-style: lines stop 2 m short of each wall, 1 m T crossbar
+    shortLength: POOL_WIDTH_M - 4.0,
+    shortTeeLength: 1.0,
     longShow: true,
     longCount: 8,
     longSpacing: 2.7432,
     longThickness: LINE_THICKNESS_M,
+    longLength: POOL_LENGTH_M - 4.0,
+    longTeeLength: 1.0,
+    teeShow: true,
+    crossGap: 0.25,
     showGrid: false,
     showChildren: true,
   }
