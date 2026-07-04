@@ -155,7 +155,7 @@ export function Toolbar() {
   return (
     <div className="toolbar">
       <span className="app-title">
-        Dead&nbsp;Reckoning <span className="app-sub">Woollett 50 m · RoboSub 2026</span>
+        Dead&nbsp;Reckoning <span className="app-sub">RoboSub 2026</span>
       </span>
       <span className="sep" />
       <Menu
