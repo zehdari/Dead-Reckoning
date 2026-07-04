@@ -66,7 +66,7 @@ jobs:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
           releaseName: 'Dead Reckoning ${{ github.ref_name }}'
           releaseBody: >
-            Linux: `sudo apt install ./Dead_Reckoning_*.deb` ·
+            Linux: `sudo apt install ./DeadReckoning_*.deb` ·
             macOS: open the .dmg (unsigned — right-click the app, Open) ·
             Windows: run the .exe installer.
           releaseDraft: true
