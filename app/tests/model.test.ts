@@ -12,7 +12,7 @@ import {
   uniqueName,
 } from '../src/core/model'
 import { TopdownManifest, resolveMeshDir } from '../src/core/mesh'
-import { applySidecar, buildSidecar, defaultLines } from '../src/core/sidecar'
+import { applySidecar, buildSidecar, defaultLines, defaultSidecarJson } from '../src/core/sidecar'
 
 function scene(): { objects: Objects; order: string[] } {
   const objects: Objects = {
@@ -184,5 +184,27 @@ describe('sidecar', () => {
     const applied = applySidecar(json, objects, { bin: { bbox: [0, 1, 0, 1] } })
     expect(applied.objects.a.mesh).toBe('bin')
     expect(applied.tag).toBeNull()
+  })
+
+  it('bundled first-run defaults carry the team viz state', () => {
+    const objects: Objects = {
+      gate: makeProp('gate'),
+      gate_rescue: makeProp('gate_rescue', { parent: 'gate' }),
+      table: makeProp('table'),
+      bin_target1: makeProp('bin_target1', { parent: 'bin' }),
+    }
+    const manifest: TopdownManifest = { gate: { bbox: [-0.1, 0.1, -1.5, 1.5] } }
+    const applied = applySidecar(defaultSidecarJson(), objects, manifest)
+    expect(applied.objects.gate.color).toBe('#8752c8')
+    expect(applied.objects.gate.mesh).toBe('gate')
+    expect(applied.objects.gate.locked).toBe(false)
+    expect(applied.objects.gate_rescue.locked).toBe(true)
+    expect(applied.objects.bin_target1.hidden).toBe(true)
+    expect(applied.tag).toMatchObject({ x: 22.2568, y: 0, basePhi: 90, wall: 'S' })
+    expect(applied.lines.shortCount).toBe(17)
+    expect(applied.lines.longCount).toBe(8)
+    // machine-specific render-cache paths must not ship in the bundle
+    const raw = JSON.parse(defaultSidecarJson()) as { props: Record<string, { image_path: unknown }> }
+    for (const p of Object.values(raw.props)) expect(p.image_path).toBeNull()
   })
 })

@@ -1,11 +1,13 @@
 /**
- * Viz sidecar: tool-only state persisted next to the config as
- * `<config>.dr_viz.json` — per-object footprint/color/image/lock/hide, the
- * AprilTag placement and the line layout. Format-compatible with the PySide6
- * prototype (image_path points at its render cache; we additionally store the
- * mesh name). Never blocks a config save if it fails.
+ * Viz state: tool-only per-config data — per-object footprint/color/image/
+ * lock/hide, the AprilTag placement and the line layout. Stored per config in
+ * the app-data dir on desktop, as a `<config>.dr_viz.json` sidecar in the
+ * browser build (see api.ts). Format-compatible with the PySide6 prototype
+ * (image_path points at its render cache; we additionally store the mesh
+ * name). Never blocks a config save if it fails.
  */
 import { LINE_THICKNESS_M, OriginMode, Tag } from './math'
+import defaultVizData from './defaultViz.json'
 import { TopdownManifest, meshFootprint } from './mesh'
 import { Objects, PropObj } from './model'
 
@@ -186,6 +188,13 @@ export function applySidecar(
       }
     : {}
   return { objects: out, tag, lines }
+}
+
+/** Bundled first-run viz state — a snapshot of the team's
+ *  `config.yaml.dr_viz.json` (image paths stripped; the mesh field drives
+ *  sprite lookup). Applied when a config has no saved viz state yet. */
+export function defaultSidecarJson(): string {
+  return JSON.stringify(defaultVizData)
 }
 
 export function defaultLines(): LinesConfig {

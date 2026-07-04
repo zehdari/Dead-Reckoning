@@ -28,7 +28,7 @@ import {
   uniqueName,
 } from '../core/model'
 import { DEPRECATED_OBJECTS, emptyConfigText, loadConfig, saveConfig } from '../core/config'
-import { LinesConfig, applySidecar, buildSidecar, defaultLines } from '../core/sidecar'
+import { LinesConfig, applySidecar, buildSidecar, defaultLines, defaultSidecarJson } from '../core/sidecar'
 import { TopdownManifest, meshFootprint, resolveMeshDir } from '../core/mesh'
 import * as api from '../api'
 
@@ -754,15 +754,14 @@ export const useStore = create<State>()((set, get) => {
         let lines = defaultLines()
         let finalObjects = objects
         try {
-          const vizJson = await api.readViz(path)
-          if (vizJson) {
-            const applied = applySidecar(vizJson, objects, get().manifest)
-            finalObjects = applied.objects
-            if (applied.tag) tag = applied.tag
-            lines = { ...lines, ...applied.lines }
-          }
+          // no saved viz state for this config yet → bundled first-run defaults
+          const vizJson = (await api.readViz(path).catch(() => null)) ?? defaultSidecarJson()
+          const applied = applySidecar(vizJson, objects, get().manifest)
+          finalObjects = applied.objects
+          if (applied.tag) tag = applied.tag
+          lines = { ...lines, ...applied.lines }
         } catch {
-          /* no viz state — fine */
+          /* malformed viz state — keep the config as loaded */
         }
         commit(finalObjects, order, {
           tag,

@@ -130,7 +130,10 @@ Lock/hide, colors, footprints, mesh assignment, the AprilTag placement and the l
 persisted per config, in the PySide6-prototype-compatible sidecar format: the desktop app keeps
 it in its app-data dir (keyed by config path; legacy `<config>.dr_viz.json` sidecars are read
 as a fallback), the browser build writes `<config>.dr_viz.json` next to the config. It never
-blocks a config save. On config load, every object whose parent ≠ map starts **locked**
+blocks a config save. A config with no saved viz state yet (e.g. first run after install)
+gets the bundled defaults in `src/core/defaultViz.json` — a snapshot of the team's
+`config.yaml.dr_viz.json` (colors, locks, hidden helpers, tag on the S wall, lane lines).
+On config load, every object whose parent ≠ map starts **locked**
 (immovable *and* click-through — e.g. the table never swallows clicks meant for the small
 props on it); the saved viz state then overrides with saved choices. Locked/hidden objects
 remain selectable and editable via the objects list.

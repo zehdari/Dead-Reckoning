@@ -1,0 +1,544 @@
+{
+  "props": {
+    "gate": {
+      "length": 0.0762,
+      "width": 3.1242,
+      "color": "#8752c8",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.0381,
+        0.0381,
+        -1.5381,
+        1.5861
+      ],
+      "locked": false,
+      "hidden": false,
+      "mesh": "gate"
+    },
+    "gate_rescue": {
+      "length": 0.003988,
+      "width": 0.3048,
+      "color": "#c8af52",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.003988,
+        0,
+        -0.1524,
+        0.1524
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "gate_rescue"
+    },
+    "gate_repair": {
+      "length": 0.003988,
+      "width": 0.3048,
+      "color": "#52afc8",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.003988,
+        0,
+        -0.1524,
+        0.1524
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "gate_repair"
+    },
+    "slalom_parent": {
+      "length": 0.1,
+      "width": 3.1,
+      "color": "#52c89f",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.05,
+        0.05,
+        -1.55,
+        1.55
+      ],
+      "locked": false,
+      "hidden": false,
+      "mesh": "slalom"
+    },
+    "slalom_front": {
+      "length": 0.6,
+      "width": 0.6,
+      "color": "#c87a52",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": null,
+      "locked": true,
+      "hidden": true,
+      "mesh": null
+    },
+    "slalom_middle": {
+      "length": 0.1,
+      "width": 3.1,
+      "color": "#52c8a5",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.05,
+        0.05,
+        -1.55,
+        1.55
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "slalom"
+    },
+    "slalom_back": {
+      "length": 0.1,
+      "width": 3.1,
+      "color": "#52c8b8",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.05,
+        0.05,
+        -1.55,
+        1.55
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "slalom"
+    },
+    "torpedo": {
+      "length": 0.49569399999999997,
+      "width": 0.743712,
+      "color": "#c85264",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.022454,
+        0.47324,
+        -0.371856,
+        0.371856
+      ],
+      "locked": false,
+      "hidden": false,
+      "mesh": "torpedo"
+    },
+    "fire_hole_large": {
+      "length": 0.6,
+      "width": 0.6,
+      "color": "#c86c52",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": null,
+      "locked": true,
+      "hidden": true,
+      "mesh": null
+    },
+    "fire_hole_small": {
+      "length": 0.6,
+      "width": 0.6,
+      "color": "#52c8c2",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": null,
+      "locked": true,
+      "hidden": true,
+      "mesh": null
+    },
+    "blood_hole_large": {
+      "length": 0.6,
+      "width": 0.6,
+      "color": "#60c852",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": null,
+      "locked": true,
+      "hidden": true,
+      "mesh": null
+    },
+    "blood_hole_small": {
+      "length": 0.6,
+      "width": 0.6,
+      "color": "#9b52c8",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": null,
+      "locked": true,
+      "hidden": true,
+      "mesh": null
+    },
+    "bin": {
+      "length": 1.401373,
+      "width": 0.991616,
+      "color": "#c85274",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.670336,
+        0.731037,
+        -0.495808,
+        0.495808
+      ],
+      "locked": false,
+      "hidden": false,
+      "mesh": "bin"
+    },
+    "bin_target1": {
+      "length": 0.6,
+      "width": 0.6,
+      "color": "#52c862",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": null,
+      "locked": true,
+      "hidden": true,
+      "mesh": null
+    },
+    "bin_target2": {
+      "length": 0.6,
+      "width": 0.6,
+      "color": "#52c864",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": null,
+      "locked": true,
+      "hidden": true,
+      "mesh": null
+    },
+    "bin_cad_geometry": {
+      "length": 0.6,
+      "width": 0.6,
+      "color": "#c8a752",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": null,
+      "locked": true,
+      "hidden": true,
+      "mesh": null
+    },
+    "magnet_target1": {
+      "length": 0.075,
+      "width": 0.125,
+      "color": "#c87852",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.075,
+        0,
+        -0.0625,
+        0.0625
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "bin_magnet"
+    },
+    "magnet_target2": {
+      "length": 0.075,
+      "width": 0.125,
+      "color": "#c87a52",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.075,
+        0,
+        -0.0625,
+        0.0625
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "bin_magnet"
+    },
+    "magnet1": {
+      "length": 0.075,
+      "width": 0.125,
+      "color": "#af52c8",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.075,
+        0,
+        -0.0625,
+        0.0625
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "bin_magnet"
+    },
+    "magnet2": {
+      "length": 0.075,
+      "width": 0.125,
+      "color": "#b052c8",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.075,
+        0,
+        -0.0625,
+        0.0625
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "bin_magnet"
+    },
+    "bin_vinyl1": {
+      "length": 0.254,
+      "width": 0.254,
+      "color": "#525cc8",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.127,
+        0.127,
+        -0.127,
+        0.127
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "bin_vinyl"
+    },
+    "bin_vinyl2": {
+      "length": 0.254,
+      "width": 0.254,
+      "color": "#525ac8",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.127,
+        0.127,
+        -0.127,
+        0.127
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "bin_vinyl"
+    },
+    "bin_vinyl3": {
+      "length": 0.254,
+      "width": 0.254,
+      "color": "#5258c8",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.127,
+        0.127,
+        -0.127,
+        0.127
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "bin_vinyl"
+    },
+    "bin_vinyl4": {
+      "length": 0.254,
+      "width": 0.254,
+      "color": "#5256c8",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.127,
+        0.127,
+        -0.127,
+        0.127
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "bin_vinyl"
+    },
+    "table": {
+      "length": 1.126236,
+      "width": 0.667512,
+      "color": "#b4c852",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.563118,
+        0.563118,
+        -0.333756,
+        0.333756
+      ],
+      "locked": false,
+      "hidden": false,
+      "mesh": "table"
+    },
+    "pill": {
+      "length": 0.070104,
+      "width": 0.070104,
+      "color": "#afc852",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.035052,
+        0.035052,
+        -0.035052,
+        0.035052
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "table_pill"
+    },
+    "bandage": {
+      "length": 0.084836,
+      "width": 0.084836,
+      "color": "#c88552",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.042418,
+        0.042418,
+        -0.042418,
+        0.042418
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "table_bandage"
+    },
+    "nut_and_bolt": {
+      "length": 0.070104,
+      "width": 0.070104,
+      "color": "#c85254",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.035052,
+        0.035052,
+        -0.035052,
+        0.035052
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "table_nut_and_bolt"
+    },
+    "plug": {
+      "length": 0.084836,
+      "width": 0.084836,
+      "color": "#c85266",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.042418,
+        0.042418,
+        -0.042418,
+        0.042418
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "table_plug"
+    },
+    "helmet": {
+      "length": 0.26924,
+      "width": 0.26924,
+      "color": "#c852b6",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.13462,
+        0.13462,
+        -0.13462,
+        0.13462
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "table_basket_helmet"
+    },
+    "warning": {
+      "length": 0.26924,
+      "width": 0.26924,
+      "color": "#52c889",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.13462,
+        0.13462,
+        -0.13462,
+        0.13462
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "table_basket_warning"
+    },
+    "compass": {
+      "length": 0.003988,
+      "width": 0.3048,
+      "color": "#c85652",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.003988,
+        0,
+        -0.1524,
+        0.1524
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "octagon_compass"
+    },
+    "hammer_and_wrench": {
+      "length": 0.003988,
+      "width": 0.3048,
+      "color": "#7652c8",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.003988,
+        0,
+        -0.1524,
+        0.1524
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "octagon_hammer_and_wrench"
+    },
+    "buoy": {
+      "length": 0.003988,
+      "width": 0.3048,
+      "color": "#c85258",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.003988,
+        0,
+        -0.1524,
+        0.1524
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "octagon_buoy"
+    },
+    "sos": {
+      "length": 0.003988,
+      "width": 0.3048,
+      "color": "#c852b2",
+      "image_path": null,
+      "image_rot": 0,
+      "img_bbox": [
+        -0.003988,
+        0,
+        -0.1524,
+        0.1524
+      ],
+      "locked": true,
+      "hidden": false,
+      "mesh": "octagon_sos"
+    }
+  },
+  "apriltag": {
+    "x": 22.2568,
+    "y": 0,
+    "base_phi": 90,
+    "wall": "S",
+    "yaw_offset": 0,
+    "mode": "apriltag"
+  },
+  "lines": {
+    "short_show": true,
+    "short_count": 17,
+    "short_spacing": 2.7432,
+    "short_thickness": 0.254,
+    "long_show": true,
+    "long_count": 8,
+    "long_spacing": 2.7432,
+    "long_thickness": 0.254,
+    "show_grid": false,
+    "show_children": true
+  }
+}
