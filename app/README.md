@@ -54,7 +54,7 @@ which picks Tauri commands vs the dev-server HTTP API at runtime):
 - **Settings live with the app.** UI settings (theme, panel layout, checkboxes) persist
   in the WebView's localStorage under the app identifier; per-config viz state
   (hidden/locked items, colors, footprints, tag placement, lines) is stored in the
-  app-data dir (`~/.local/share/edu.osu.uwrt.deadreckoning/state/` on Linux) instead of
+  app-data dir (`~/.local/share/uwrt.deadreckoning/state/` on Linux) instead of
   a sidecar file next to the config — nothing is written into the external config's
   directory. Legacy `<config>.dr_viz.json` sidecars are still read as a fallback.
 - **Closing with unsaved changes** asks for confirmation via a native dialog.

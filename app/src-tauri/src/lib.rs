@@ -58,7 +58,7 @@ fn write_file(path: String, content: String) -> Result<(), String> {
 }
 
 /// App-local state files (per-config viz state, future settings) live under
-/// the platform app-data dir, e.g. ~/.local/share/edu.osu.uwrt.deadreckoning/state.
+/// the platform app-data dir, e.g. ~/.local/share/uwrt.deadreckoning/state.
 /// Keys are bare file names chosen by the frontend; anything path-like is rejected.
 fn state_file(app: &tauri::AppHandle, key: &str) -> Result<PathBuf, String> {
     let ok = !key.is_empty()

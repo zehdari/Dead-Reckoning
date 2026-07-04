@@ -2,7 +2,7 @@
 name = "dead-reckoning"
 version = "1.0.2"
 description = "Top-down pool layout editor for the riptide_mapping config"
-authors = ["OSU UWRT"]
+authors = ["UWRT"]
 edition = "2021"
 
 [lib]
