@@ -717,14 +717,9 @@ export const useStore = create<State>()((set, get) => {
     },
 
     bootstrap: async () => {
-      try {
-        const manifest = (await fetch('/topdown/manifest.json').then((r) =>
-          r.ok ? r.json() : {},
-        )) as TopdownManifest
-        set({ manifest })
-      } catch {
-        set({ manifest: {} })
-      }
+      // Inlined by the `define` in vite.config.ts — a runtime fetch of
+      // /topdown/manifest.json fails in the packaged Tauri (WebKitGTK) build.
+      set({ manifest: __TOPDOWN_MANIFEST__ })
       let env: api.Env | null = null
       try {
         env = await api.env()

@@ -136,16 +136,35 @@ export function App() {
         import('@tauri-apps/api/window'),
         import('@tauri-apps/plugin-dialog'),
       ])
-      const un = await getCurrentWindow().onCloseRequested(async (e) => {
-        if (!useStore.getState().dirty) return
+      const win = getCurrentWindow()
+      // Always preventDefault synchronously, then decide and close explicitly.
+      // Awaiting inside the handler without this can race Tauri's close
+      // decision, and on WebKitGTK a hung native dialog would otherwise trap
+      // the window open forever.
+      const un = await win.onCloseRequested(async (e) => {
+        if (!useStore.getState().dirty) return // clean → let it close
+        e.preventDefault()
         const leave = await ask('You have unsaved changes. Quit anyway?', {
           title: 'Dead Reckoning',
           kind: 'warning',
         })
-        if (!leave) e.preventDefault()
+        if (leave) await win.destroy()
       })
-      if (disposed) un()
-      else unlisten = un
+      // Escape hatch: Ctrl/Cmd+Q force-closes unconditionally, so a
+      // misbehaving dialog can never leave the window unclosable.
+      const onQuit = (e: KeyboardEvent) => {
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'q' || e.key === 'Q')) {
+          e.preventDefault()
+          void win.destroy()
+        }
+      }
+      window.addEventListener('keydown', onQuit, true)
+      const un2 = () => {
+        un()
+        window.removeEventListener('keydown', onQuit, true)
+      }
+      if (disposed) un2()
+      else unlisten = un2
     })()
     return () => {
       disposed = true

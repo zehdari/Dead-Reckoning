@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Main window: core APIs + native file dialogs. File access goes through the custom commands in lib.rs (home + /tmp only), not the fs plugin.",
   "windows": ["main"],
-  "permissions": ["core:default", "dialog:default"]
+  "permissions": ["core:default", "core:window:allow-destroy", "dialog:default"]
 }

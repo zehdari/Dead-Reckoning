@@ -7,7 +7,15 @@
  * y-flip so all scene math stays in pool world coordinates (Y-up, meters).
  * Labels are DOM elements (crisp at any zoom, constant on-screen size).
  */
-import { Application, Assets, Container, Graphics, Sprite, Texture } from 'pixi.js'
+import {
+  Application,
+  Assets,
+  Container,
+  Graphics,
+  Sprite,
+  Texture,
+  loadTextures,
+} from 'pixi.js'
 import {
   MAP,
   POOL_LENGTH_M,
@@ -21,6 +29,18 @@ import {
 import { LocalRect, PropObj, hitTest, localRect, worldBBox } from '../core/model'
 import { hasTexture, texUrlFor, topdownUrl } from '../core/mesh'
 import { State, Theme, labeledNames, useStore } from '../state/store'
+
+// In the packaged Tauri app the frontend is served from a custom protocol
+// (tauri://localhost in the Linux WebKitGTK webview). PixiJS v8 loads textures
+// with fetch() — in a Web Worker by default, on the main thread via
+// fetch + createImageBitmap — and fetch of the custom protocol fails silently
+// there, so every sprite falls back to a plain rectangle. Disabling both makes
+// Pixi load through `new Image()`, the same document loader path that already
+// resolves /assets/* successfully in `tauri dev` and the build.
+if (loadTextures.config) {
+  loadTextures.config.preferWorkers = false
+  loadTextures.config.preferCreateImageBitmap = false
+}
 
 interface Palette {
   deck: number
@@ -779,7 +799,10 @@ export class PoolScene {
         }
         this.drawTag(s.tag) // origin talos sprite may have been waiting
       })
-      .catch(() => this.textures.delete(url))
+      .catch((e) => {
+        this.textures.delete(url)
+        useStore.getState().say(`tex ${url}: ${e?.message ?? e}`, 'error')
+      })
     return null
   }
 

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Dead Reckoning",
+  "productName": "Dead_Reckoning",
   "version": "1.0.0",
   "identifier": "edu.osu.uwrt.deadreckoning",
   "build": {

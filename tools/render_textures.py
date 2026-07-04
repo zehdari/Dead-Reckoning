@@ -3,10 +3,15 @@
 
 Some task props carry their real graphic on a face that reads clearly from
 straight overhead (the table pill/bandage/etc. and the bin fire/blood vinyls).
-For those we prefer the actual texture PNG over the gray silhouette. This trims
-each texture, knocks out its white background, pads it to a square so the icon
-stays undistorted, and writes it to app/public/topdown/tex/, then records the
-sprite + its square footprint (from the model XY bbox) into manifest.json.
+For those we prefer the actual texture PNG over the gray silhouette. This pads
+each texture to a square so the icon stays undistorted (keeping its native
+background), and writes it to app/public/topdown/tex/, then records the sprite
++ its square footprint (from the model XY bbox) into manifest.json.
+
+The basket warning/helmet graphics are printed sideways from overhead: their
+DAE quad maps image-up to model +X, so we rotate the source 90 degrees
+clockwise to match the mesh's top-down orientation (the others have no obvious
+"up", so they read fine as-is).
 
 Run after render_topdowns.py:
     python3 tools/render_textures.py
@@ -37,24 +42,14 @@ TEXTURE_SPRITES = {
 TEXTURE_BY_CLASS = {
     "bin_vinyl": {"fire": "Task3_Fire_Fixed.png", "blood": "Task3_Blood_Fixed.png"},
 }
-
-
-def knockout_white(im: Image.Image) -> Image.Image:
-    """RGBA image with near-white, low-saturation pixels made transparent."""
-    im = im.convert("RGBA")
-    px = im.load()
-    w, h = im.size
-    for y in range(h):
-        for x in range(w):
-            r, g, b, a = px[x, y]
-            mn, mx = min(r, g, b), max(r, g, b)
-            if a and mn >= 235 and (mx - mn) <= 14:  # bright + gray => background
-                px[x, y] = (r, g, b, 0)
-    return im
+# graphics whose DAE quad maps image-up to model +X: rotate the source 90 CW so
+# the sprite lands in the mesh's true top-down orientation.
+ROTATE_CW = {"table_basket_warning", "table_basket_helmet"}
 
 
 def trim_and_square(im: Image.Image) -> Image.Image:
-    bbox = im.getbbox()  # non-transparent bounds
+    im = im.convert("RGBA")
+    bbox = im.getbbox()  # non-empty bounds
     if bbox:
         im = im.crop(bbox)
     w, h = im.size
@@ -69,11 +64,14 @@ def square_half_extent(bbox: list[float]) -> float:
     return max(abs(x0), abs(x1), abs(y0), abs(y1))
 
 
-def process(src: Path, dst: Path) -> bool:
+def process(src: Path, dst: Path, rotate_cw: bool = False) -> bool:
     if not src.exists():
         print(f"  MISSING {src}")
         return False
-    trim_and_square(knockout_white(Image.open(src))).save(dst)
+    im = Image.open(src)
+    if rotate_cw:
+        im = im.transpose(Image.Transpose.ROTATE_270)  # 90 CW: image-up -> model +X
+    trim_and_square(im).save(dst)
     return True
 
 
@@ -89,7 +87,7 @@ def main() -> int:
         if not entry:
             continue
         dst = TEX / f"{mesh}.png"
-        if process(MESH_ROOT / mesh / texfile, dst):
+        if process(MESH_ROOT / mesh / texfile, dst, rotate_cw=mesh in ROTATE_CW):
             entry["tex"] = f"tex/{mesh}.png"
             entry["texSquare"] = round(square_half_extent(entry["bbox"]), 6)
             print(f"  ok   {mesh}  <- {texfile}")

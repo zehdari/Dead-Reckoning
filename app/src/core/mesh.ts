@@ -26,15 +26,22 @@ export interface TopdownManifest {
   [dir: string]: MeshEntry
 }
 
+/** Root-relative path -> fully-qualified URL. PixiJS's path resolver drops the
+ *  host from unknown origins (tauri://localhost + /topdown/x.png becomes
+ *  tauri://topdown/x.png in the packaged app), so never hand it a bare path. */
+function absUrl(path: string): string {
+  return typeof document === 'undefined' ? path : new URL(path, document.baseURI).href
+}
+
 /** Resolve the texture sprite URL for a mesh (+ optional class), or null. */
 export function texUrlFor(entry: MeshEntry | undefined, cls: string | null): string | null {
   if (!entry) return null
   if (entry.texByClass) {
     const key = (cls ?? '').toLowerCase()
     const f = entry.texByClass[key]
-    return f ? `/topdown/${f}` : null
+    return f ? absUrl(`/topdown/${f}`) : null
   }
-  return entry.tex ? `/topdown/${entry.tex}` : null
+  return entry.tex ? absUrl(`/topdown/${entry.tex}`) : null
 }
 
 /** True if this mesh has any top-down texture available. */
@@ -74,5 +81,5 @@ export function resolveMeshDir(name: string, dirs: string[]): string | null {
 }
 
 export function topdownUrl(mesh: string): string {
-  return `/topdown/${mesh}.png`
+  return absUrl(`/topdown/${mesh}.png`)
 }
