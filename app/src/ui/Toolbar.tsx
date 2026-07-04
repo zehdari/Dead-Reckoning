@@ -107,6 +107,21 @@ export function Toolbar() {
     if (configPath) void st().saveToPath(configPath)
     else saveAs()
   }
+  // Ctrl/Cmd+S saves (even while typing in a field — the browser's own
+  // "save page" dialog must never appear). Ref so the listener registers once.
+  const doSaveRef = useRef(doSave)
+  doSaveRef.current = doSave
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault()
+        doSaveRef.current()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   // desktop: native file dialogs; browser: the in-app path prompt
   const doLoad = () => {
     if (api.isDesktop) {
