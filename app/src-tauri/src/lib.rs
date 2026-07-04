@@ -3,17 +3,19 @@
 //! settings/viz data that belong to the app rather than next to the config.
 
 use std::fs;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component, PathBuf};
 
 use tauri::Manager;
 
-/// Same policy as the dev-server API: only absolute paths under the user's
-/// home directory or /tmp are reachable from the UI. `..` segments are
-/// rejected rather than resolved.
-fn check_allowed(path: &str, home: &Path) -> Result<PathBuf, String> {
+/// Unlike the dev-server API (which listens on localhost HTTP, reachable by
+/// any local process or web page, and so stays fenced to home + tmp), these
+/// commands are only invocable from the app's own webview — any absolute
+/// local path is fine, including other drives and UNC/WSL shares on Windows.
+/// `..` segments are rejected rather than resolved.
+fn check_allowed(path: &str) -> Result<PathBuf, String> {
     let p = PathBuf::from(path);
     let dotdot = p.components().any(|c| matches!(c, Component::ParentDir));
-    if p.is_absolute() && !dotdot && (p.starts_with(home) || p.starts_with("/tmp")) {
+    if p.is_absolute() && !dotdot {
         Ok(p)
     } else {
         Err(format!("path not allowed: {path}"))
@@ -41,16 +43,14 @@ fn env_info(app: tauri::AppHandle) -> Result<EnvInfo, String> {
 }
 
 #[tauri::command]
-fn read_file(app: tauri::AppHandle, path: String) -> Result<String, String> {
-    let home = app.path().home_dir().map_err(|e| e.to_string())?;
-    let p = check_allowed(&path, &home)?;
+fn read_file(path: String) -> Result<String, String> {
+    let p = check_allowed(&path)?;
     fs::read_to_string(&p).map_err(|e| format!("{}: {e}", p.display()))
 }
 
 #[tauri::command]
-fn write_file(app: tauri::AppHandle, path: String, content: String) -> Result<(), String> {
-    let home = app.path().home_dir().map_err(|e| e.to_string())?;
-    let p = check_allowed(&path, &home)?;
+fn write_file(path: String, content: String) -> Result<(), String> {
+    let p = check_allowed(&path)?;
     if let Some(dir) = p.parent() {
         fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }

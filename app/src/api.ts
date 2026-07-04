@@ -63,7 +63,7 @@ function vizKey(configPath: string): string {
     h ^= configPath.charCodeAt(i)
     h = Math.imul(h, 0x01000193)
   }
-  const base = (configPath.split('/').pop() ?? 'config').replace(/[^A-Za-z0-9_-]+/g, '_')
+  const base = (configPath.split(/[\\/]/).pop() ?? 'config').replace(/[^A-Za-z0-9_-]+/g, '_')
   return `viz-${base}-${(h >>> 0).toString(16)}.json`
 }
 

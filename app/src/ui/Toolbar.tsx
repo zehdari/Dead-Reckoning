@@ -99,7 +99,7 @@ export function Toolbar() {
   const [dialog, setDialog] = useState<Dialog>(null)
 
   const st = () => useStore.getState()
-  const fallbackDir = configPath ? configPath.replace(/\/[^/]*$/, '') : (home ?? '')
+  const fallbackDir = configPath ? configPath.replace(/[\\/][^\\/]*$/, '') : (home ?? '')
   const placing = placeMode !== null
   const robot = originMode === 'robot'
 
@@ -240,7 +240,7 @@ export function Toolbar() {
       <span className="spacer" />
       <span className="path-chip" title={configPath ?? 'no config loaded'}>
         {dirty && <span className="dirty-dot" title="unsaved changes" />}
-        {configPath ? configPath.split('/').slice(-2).join('/') : 'unsaved layout'}
+        {configPath ? configPath.split(/[\\/]/).slice(-2).join('/') : 'unsaved layout'}
       </span>
       {dialog && (
         <PathDialog

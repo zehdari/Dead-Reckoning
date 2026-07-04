@@ -775,7 +775,7 @@ export const useStore = create<State>()((set, get) => {
         set({ dirty: false, past: [], future: [] })
         markClean()
         LS.set(LAST_CONFIG, path)
-        get().say(`Loaded ${order.length} objects from ${ns} (${path.split('/').pop()}).`)
+        get().say(`Loaded ${order.length} objects from ${ns} (${path.split(/[\\/]/).pop()}).`)
       } catch (e) {
         get().say(`Load failed: ${e instanceof Error ? e.message : e}`, 'error')
         throw e
@@ -801,7 +801,7 @@ export const useStore = create<State>()((set, get) => {
         } catch {
           /* viz state is best-effort; never block a config save on it */
         }
-        get().say(`Saved ${s.order.length} objects to ${path.split('/').pop()}.`)
+        get().say(`Saved ${s.order.length} objects to ${path.split(/[\\/]/).pop()}.`)
       } catch (e) {
         get().say(`Save failed: ${e instanceof Error ? e.message : e}`, 'error')
         throw e

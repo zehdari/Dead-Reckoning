@@ -16,7 +16,12 @@ export const DEFAULT_CONFIG_PATH =
 
 function allowed(p: string): boolean {
   const r = path.resolve(p)
-  return r.startsWith(os.homedir() + path.sep) || r.startsWith('/tmp/')
+  // path.relative (not startsWith) so Windows paths pass regardless of drive
+  // letter/segment casing or `\` vs `/` — the comparison is case-insensitive
+  // on win32.
+  const rel = path.relative(os.homedir(), r)
+  const underHome = rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel)
+  return underHome || r.startsWith('/tmp/') || r.startsWith(os.tmpdir() + path.sep)
 }
 
 function send(res: any, status: number, data: unknown): void {
