@@ -329,24 +329,22 @@ function SceneInspector() {
             <NumberField value={lines.longCount} decimals={0} step={1} width={52} onCommit={(v) => st().setLines({ longCount: Math.max(0, Math.round(v)) })} />
             <NumberField value={lines.longSpacing} decimals={4} step={0.01} width={80} suffix="m" onCommit={(v) => st().setLines({ longSpacing: Math.max(0.1, v) })} />
             <NumberField value={lines.longThickness} decimals={3} step={0.01} width={64} suffix="m" title="Stripe thickness of the along lines" onCommit={(v) => st().setLines({ longThickness: Math.max(0.02, v) })} />
+          </div>
+          <div className="lines-grid ends">
             <label className="check" title="T crossbars at line ends, same thickness as the line">
               <input type="checkbox" checked={lines.teeShow} onChange={(e) => st().setLines({ teeShow: e.target.checked })} />
               T ends
             </label>
             <span className="muted">length</span>
             <span className="muted">T length</span>
-            <span />
             <span>across</span>
             <NumberField value={lines.shortLength} decimals={3} step={0.1} width={80} suffix="m" title="Run length of the across lines (centered on the pool width)" onCommit={(v) => st().setLines({ shortLength: Math.max(0.2, v) })} />
             <NumberField value={lines.shortTeeLength} decimals={3} step={0.05} width={64} suffix="m" disabled={!lines.teeShow} title="Length of the T crossbar at each across-line end" onCommit={(v) => st().setLines({ shortTeeLength: Math.max(0.05, v) })} />
-            <span />
             <span>along</span>
             <NumberField value={lines.longLength} decimals={3} step={0.1} width={80} suffix="m" title="Run length of the along lines (centered on the pool length)" onCommit={(v) => st().setLines({ longLength: Math.max(0.2, v) })} />
             <NumberField value={lines.longTeeLength} decimals={3} step={0.05} width={64} suffix="m" disabled={!lines.teeShow} title="Length of the T crossbar at each along-line end" onCommit={(v) => st().setLines({ longTeeLength: Math.max(0.05, v) })} />
-            <span />
             <span>cut gap</span>
             <NumberField value={lines.crossGap} decimals={3} step={0.05} width={80} suffix="m" title="Air gap between the cut ends of the along lines and the crossing across lines" onCommit={(v) => st().setLines({ crossGap: Math.max(0, v) })} />
-            <span />
             <span />
           </div>
         </details>

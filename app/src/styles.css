@@ -868,6 +868,12 @@ button.col-flag.hide.on {
   align-items: center;
 }
 
+/* length / T-end rows: own grid so the wide length fields don't stretch the count column */
+.lines-grid.ends {
+  grid-template-columns: 1fr auto auto;
+  margin-top: 4px;
+}
+
 .lines-grid > span.muted {
   font-size: 10px;
   text-align: center;

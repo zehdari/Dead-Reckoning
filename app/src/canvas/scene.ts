@@ -655,6 +655,11 @@ export class PoolScene {
       // crossing so the cut ends sit an air gap away from the across stripe
       const shortL = Math.min(ln.shortLength, POOL_WIDTH_M)
       const sy0 = (POOL_WIDTH_M - shortL) / 2
+      // only the across stem cuts — its T ends don't, so an along line may
+      // overlap an across T bar
+      const teeT = ln.teeShow ? ln.shortThickness : 0
+      const cut0 = sy0 + teeT
+      const cut1 = sy0 + shortL - teeT
       const cutHalf = ln.shortThickness / 2 + Math.max(ln.crossGap, 0)
       const xs = ln.shortShow
         ? centeredPositions(POOL_LENGTH_M, ln.shortCount, ln.shortSpacing)
@@ -669,7 +674,7 @@ export class PoolScene {
           s0 += t
           s1 -= t
         }
-        const cuts = y + t / 2 > sy0 && y - t / 2 < sy0 + shortL ? xs : []
+        const cuts = y + t / 2 > cut0 && y - t / 2 < cut1 ? xs : []
         let segs: Array<[number, number]> = s1 > s0 ? [[s0, s1]] : []
         for (const x of cuts) {
           const lo = x - cutHalf
