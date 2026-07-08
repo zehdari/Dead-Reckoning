@@ -3,7 +3,7 @@ name = "dead-reckoning"
 version = "1.0.0"
 description = "Top-down pool layout editor for the riptide_mapping config"
 authors = ["UWRT"]
-edition = "2026"
+edition = "2021"
 
 [lib]
 name = "dead_reckoning_lib"
