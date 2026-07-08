@@ -1,9 +1,9 @@
 [package]
 name = "dead-reckoning"
-version = "1.0.2"
+version = "1.0.0"
 description = "Top-down pool layout editor for the riptide_mapping config"
 authors = ["UWRT"]
-edition = "2021"
+edition = "2026"
 
 [lib]
 name = "dead_reckoning_lib"
