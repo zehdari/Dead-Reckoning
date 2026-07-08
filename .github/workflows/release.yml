@@ -70,6 +70,8 @@ jobs:
             macOS: open the .dmg, drag to Applications, then run
             `xattr -cr /Applications/DeadReckoning.app` (unsigned build) ·
             Windows: run the .exe installer.
+          # Kept as a draft while the four platform builds upload in
+          # parallel; the publish job below flips it live once all succeed.
           releaseDraft: true
           args: ${{ matrix.args }}
 
@@ -83,3 +85,14 @@ jobs:
             app/src-tauri/target/**/bundle/dmg/*.dmg
             app/src-tauri/target/**/bundle/nsis/*.exe
             app/src-tauri/target/**/bundle/msi/*.msi
+
+  publish:
+    name: Publish release
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark release as published
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit '${{ github.ref_name }}' --repo '${{ github.repository }}' --draft=false

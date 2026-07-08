@@ -2,6 +2,8 @@
 
 A top-down 2D editor of the RoboSub competition pool. Place the map origin, drag task props to where they physically sit, and save the result straight into the team's `riptide_mapping` `config.yaml`.
 
+> This app built on vibes: S/O Claude. It works, but read the source with that in mind.
+
 ![Dead Reckoning app screenshot](assets/app_screenshot.png)
 
 ## Getting started
