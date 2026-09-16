@@ -18,14 +18,13 @@ import {
 } from 'pixi.js'
 import {
   MAP,
-  POOL_LENGTH_M,
-  POOL_WIDTH_M,
   Tag,
-  centeredPositions,
+  linePositions,
   mapToWorld,
   tagCandidates,
   tagPhi,
 } from '../core/math'
+import { effectiveRun, lineFamilies } from '../core/sidecar'
 import { LocalRect, PropObj, hitTest, localRect, worldBBox } from '../core/model'
 import { hasTexture, texUrlFor, topdownUrl } from '../core/mesh'
 import { State, Theme, labeledNames, useStore } from '../state/store'
@@ -275,8 +274,8 @@ export class PoolScene {
     const m = 3
     let minX = -m
     let minY = -m
-    let maxX = POOL_LENGTH_M + m
-    let maxY = POOL_WIDTH_M + m
+    let maxX = s.pool.lengthM + m
+    let maxY = s.pool.widthM + m
     for (const name of s.order) {
       const v = this.views.get(name)
       const p = s.objects[name]
@@ -300,12 +299,13 @@ export class PoolScene {
   fit(): void {
     const { w, h } = this.viewSize()
     if (w <= 0 || h <= 0) return
+    const pool = useStore.getState().pool
     const m = 2
-    const rw = POOL_LENGTH_M + 2 * m
-    const rh = POOL_WIDTH_M + 2 * m
+    const rw = pool.lengthM + 2 * m
+    const rh = pool.widthM + 2 * m
     this.k = Math.min(w / rw, h / rh)
-    this.tx = w / 2 - this.k * (POOL_LENGTH_M / 2)
-    this.ty = h / 2 + this.k * (POOL_WIDTH_M / 2)
+    this.tx = w / 2 - this.k * (pool.lengthM / 2)
+    this.ty = h / 2 + this.k * (pool.widthM / 2)
     this.applyCamera()
     this.redrawZoomDependent()
   }
@@ -484,8 +484,8 @@ export class PoolScene {
         this.applyCamera()
         return
       case 'drag': {
-        const nx = Math.min(Math.max(wx - this.mode.offX, -POOL_CLAMP), POOL_LENGTH_M + POOL_CLAMP)
-        const ny = Math.min(Math.max(wy - this.mode.offY, -POOL_CLAMP), POOL_WIDTH_M + POOL_CLAMP)
+        const nx = Math.min(Math.max(wx - this.mode.offX, -POOL_CLAMP), s.pool.lengthM + POOL_CLAMP)
+        const ny = Math.min(Math.max(wy - this.mode.offY, -POOL_CLAMP), s.pool.widthM + POOL_CLAMP)
         s.setWorldXY(this.mode.name, nx, ny)
         return
       }
@@ -550,6 +550,7 @@ export class PoolScene {
     const objectsChanged = force || s.objects !== l.objects || s.order !== l.order
     const posesChanged = force || s.mapPoses !== l.mapPoses
     const tagChanged = force || s.tag !== l.tag
+    const poolChanged = force || s.pool !== l.pool
     const linesChanged = force || s.lines !== l.lines
     const selChanged = force || s.selected !== l.selected
     const placeChanged = force || s.placeMode !== l.placeMode
@@ -557,8 +558,8 @@ export class PoolScene {
     // Ignore no-op notifications (e.g. cursor-only setState during a mouse move) so
     // labels and layers don't churn every frame.
     if (
-      !(themeChanged || objectsChanged || posesChanged || tagChanged || linesChanged ||
-        selChanged || placeChanged || labelChanged)
+      !(themeChanged || objectsChanged || posesChanged || tagChanged || poolChanged ||
+        linesChanged || selChanged || placeChanged || labelChanged)
     )
       return
     this.last = {
@@ -566,6 +567,7 @@ export class PoolScene {
       order: s.order,
       mapPoses: s.mapPoses,
       tag: s.tag,
+      pool: s.pool,
       lines: s.lines,
       selected: s.selected,
       placeMode: s.placeMode,
@@ -577,14 +579,15 @@ export class PoolScene {
       this.pal = PALETTES[s.theme]
       this.app.renderer.background.color = this.pal.deck
     }
-    if (themeChanged || force) {
-      this.drawStatic()
+    if (themeChanged || poolChanged || force) {
+      this.drawStatic(s)
       this.drawPoolFrame()
     }
-    if (themeChanged || linesChanged) {
+    if (themeChanged || poolChanged || linesChanged) {
       this.drawLanes(s)
       this.drawGrid(s)
     }
+    if (poolChanged && !force) this.fit() // new venue: reframe the camera
     if (themeChanged || tagChanged) this.drawTag(s.tag)
     if (objectsChanged) this.reconcileViews(s)
     if (themeChanged) for (const [name, v] of this.views) this.applyVisual(v, s.objects[name])
@@ -592,7 +595,7 @@ export class PoolScene {
     if (objectsChanged) this.resortZ(s)
     if (themeChanged || selChanged || objectsChanged || posesChanged || linesChanged)
       this.drawGizmo(s)
-    if (placeChanged || linesChanged || themeChanged) {
+    if (placeChanged || linesChanged || poolChanged || themeChanged) {
       this.candLayer.visible = s.placeMode === 'apriltag'
       if (s.placeMode === 'apriltag') this.drawCandidates(s)
       this.updatePoolFrameVisibility(s)
@@ -617,12 +620,14 @@ export class PoolScene {
 
   // ------------------------------- static drawing -------------------------------
 
-  private drawStatic(): void {
+  private drawStatic(s: State): void {
     const g = this.staticLayer
+    const L = s.pool.lengthM
+    const W = s.pool.widthM
     g.clear()
-    g.rect(-0.3, -0.3, POOL_LENGTH_M + 0.6, POOL_WIDTH_M + 0.6).fill(this.pal.wall)
-    g.rect(0, 0, POOL_LENGTH_M, POOL_WIDTH_M).fill(this.pal.water)
-    g.rect(0.06, 0.06, POOL_LENGTH_M - 0.12, POOL_WIDTH_M - 0.12).stroke({
+    g.rect(-0.3, -0.3, L + 0.6, W + 0.6).fill(this.pal.wall)
+    g.rect(0, 0, L, W).fill(this.pal.water)
+    g.rect(0.06, 0.06, L - 0.12, W - 0.12).stroke({
       width: 0.12,
       color: this.pal.waterEdge,
     })
@@ -631,52 +636,57 @@ export class PoolScene {
   private drawLanes(s: State): void {
     const g = this.laneLayer
     g.clear()
+    const poolL = s.pool.lengthM
+    const poolW = s.pool.widthM
     const ln = s.lines
     // T ends are built from non-overlapping rects (bar + inset stem) so the
     // translucent fill doesn't double-blend where they meet
+    const shorts: Array<{ x: number; y0: number; y1: number }> = []
     if (ln.shortShow) {
       const t = ln.shortThickness
-      const L = Math.min(ln.shortLength, POOL_WIDTH_M)
-      const y0 = (POOL_WIDTH_M - L) / 2
-      for (const x of centeredPositions(POOL_LENGTH_M, ln.shortCount, ln.shortSpacing)) {
-        if (ln.teeShow) {
+      const xs = linePositions(poolL, ln.shortCount, ln.shortSpacing, ln.shortAnchor)
+      xs.forEach((x, i) => {
+        const run = effectiveRun(ln.shortRuns, i, ln.shortLength, poolW)
+        const y0 = run.start
+        const L = run.length
+        if (L <= 0) return
+        shorts.push({ x, y0, y1: y0 + L })
+        if (ln.shortTee) {
           const b = Math.max(ln.shortTeeLength, t)
           g.rect(x - b / 2, y0, b, t)
           g.rect(x - b / 2, y0 + L - t, b, t)
           g.rect(x - t / 2, y0 + t, t, Math.max(L - 2 * t, 0))
         } else g.rect(x - t / 2, y0, t, L)
-      }
+      })
     }
     if (ln.longShow) {
       const t = ln.longThickness
-      const L = Math.min(ln.longLength, POOL_LENGTH_M)
-      const x0 = (POOL_LENGTH_M - L) / 2
       // the across lines cut through the along lines: drop a window around each
-      // crossing so the cut ends sit an air gap away from the across stripe
-      const shortL = Math.min(ln.shortLength, POOL_WIDTH_M)
-      const sy0 = (POOL_WIDTH_M - shortL) / 2
-      // only the across stem cuts — its T ends don't, so an along line may
-      // overlap an across T bar
-      const teeT = ln.teeShow ? ln.shortThickness : 0
-      const cut0 = sy0 + teeT
-      const cut1 = sy0 + shortL - teeT
+      // crossing so the cut ends sit an air gap away from the across stripe.
+      // Only the across stem cuts — its T ends don't, so an along line may
+      // overlap an across T bar.
+      const teeT = ln.shortTee ? ln.shortThickness : 0
       const cutHalf = ln.shortThickness / 2 + Math.max(ln.crossGap, 0)
-      const xs = ln.shortShow
-        ? centeredPositions(POOL_LENGTH_M, ln.shortCount, ln.shortSpacing)
-        : []
-      for (const y of centeredPositions(POOL_WIDTH_M, ln.longCount, ln.longSpacing)) {
+      const ys = linePositions(poolW, ln.longCount, ln.longSpacing, ln.longAnchor)
+      ys.forEach((y, j) => {
+        const run = effectiveRun(ln.longRuns, j, ln.longLength, poolL)
+        const x0 = run.start
+        const L = run.length
+        if (L <= 0) return
         let s0 = x0
         let s1 = x0 + L
-        if (ln.teeShow) {
+        if (ln.longTee) {
           const b = Math.max(ln.longTeeLength, t)
           g.rect(x0, y - b / 2, t, b)
           g.rect(x0 + L - t, y - b / 2, t, b)
           s0 += t
           s1 -= t
         }
-        const cuts = y + t / 2 > cut0 && y - t / 2 < cut1 ? xs : []
+        const cuts = ln.crossCut
+          ? shorts.filter((sl) => y + t / 2 > sl.y0 + teeT && y - t / 2 < sl.y1 - teeT)
+          : []
         let segs: Array<[number, number]> = s1 > s0 ? [[s0, s1]] : []
-        for (const x of cuts) {
+        for (const { x } of cuts) {
           const lo = x - cutHalf
           const hi = x + cutHalf
           const next: Array<[number, number]> = []
@@ -687,7 +697,31 @@ export class PoolScene {
           segs = next
         }
         for (const [a, b] of segs) g.rect(a, y - t / 2, b - a, t)
-      }
+      })
+    }
+    // free-form extras: thickness/T length inherited from the parallel family;
+    // they don't participate in cross-cutting
+    for (const e of ln.extras) {
+      const across = e.dir === 'across'
+      const t = across ? ln.shortThickness : ln.longThickness
+      const teeLen = across ? ln.shortTeeLength : ln.longTeeLength
+      const dim = across ? poolW : poolL
+      const a = Math.max(e.start, 0)
+      const L = Math.min(e.start + e.length, dim) - a
+      if (L <= 0) continue
+      if (e.tee) {
+        const b = Math.max(teeLen, t)
+        if (across) {
+          g.rect(e.pos - b / 2, a, b, t)
+          g.rect(e.pos - b / 2, a + L - t, b, t)
+          g.rect(e.pos - t / 2, a + t, t, Math.max(L - 2 * t, 0))
+        } else {
+          g.rect(a, e.pos - b / 2, t, b)
+          g.rect(a + L - t, e.pos - b / 2, t, b)
+          g.rect(a + t, e.pos - t / 2, Math.max(L - 2 * t, 0), t)
+        }
+      } else if (across) g.rect(e.pos - t / 2, a, t, L)
+      else g.rect(a, e.pos - t / 2, L, t)
     }
     g.fill({ color: this.pal.lane, alpha: this.pal.laneAlpha })
   }
@@ -696,8 +730,10 @@ export class PoolScene {
     const g = this.gridLayer
     g.clear()
     if (!s.lines.showGrid) return
-    for (let x = 5; x < POOL_LENGTH_M; x += 5) g.moveTo(x, 0).lineTo(x, POOL_WIDTH_M)
-    for (let y = 5; y < POOL_WIDTH_M; y += 5) g.moveTo(0, y).lineTo(POOL_LENGTH_M, y)
+    const poolL = s.pool.lengthM
+    const poolW = s.pool.widthM
+    for (let x = 5; x < poolL; x += 5) g.moveTo(x, 0).lineTo(x, poolW)
+    for (let y = 5; y < poolW; y += 5) g.moveTo(0, y).lineTo(poolL, y)
     g.stroke({ width: 0.03, color: this.pal.grid, alpha: this.pal.gridAlpha })
   }
 
@@ -772,16 +808,9 @@ export class PoolScene {
   private drawCandidates(s: State): void {
     const g = this.candLayer
     g.clear()
-    const ln = s.lines
+    const fam = lineFamilies(s.lines)
     const r = Math.max(0.22, 9 / this.k)
-    for (const c of tagCandidates(
-      ln.shortShow,
-      ln.shortCount,
-      ln.shortSpacing,
-      ln.longShow,
-      ln.longCount,
-      ln.longSpacing,
-    )) {
+    for (const c of tagCandidates(s.pool, fam.short, fam.long, s.lines.extras)) {
       g.circle(c.x, c.y, r).fill({ color: this.pal.accent, alpha: 0.35 })
       g.circle(c.x, c.y, r * 0.4).fill({ color: this.pal.accent })
     }

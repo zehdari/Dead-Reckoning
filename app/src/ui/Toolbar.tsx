@@ -205,7 +205,7 @@ export function Toolbar() {
         title={
           robot
             ? 'Click anywhere in the pool to set the robot-frame map origin'
-            : 'Click a bottom-line / wall intersection to place the AprilTag (map origin)'
+            : 'Click a bottom-line / wall intersection or pool corner to place the AprilTag (map origin)'
         }
       >
         {placing ? 'Click the canvas…' : robot ? 'Place origin' : 'Place tag'}

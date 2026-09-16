@@ -7,8 +7,6 @@ import { create } from 'zustand'
 import {
   MAP,
   OriginMode,
-  POOL_LENGTH_M,
-  POOL_WIDTH_M,
   Pose4,
   Tag,
   mapToWorld,
@@ -17,6 +15,7 @@ import {
   tagCandidates,
   worldToMap,
 } from '../core/math'
+import { DEFAULT_POOL, PoolDef, poolById } from '../core/pools'
 import {
   Objects,
   PropObj,
@@ -28,7 +27,14 @@ import {
   uniqueName,
 } from '../core/model'
 import { DEPRECATED_OBJECTS, emptyConfigText, loadConfig, saveConfig } from '../core/config'
-import { LinesConfig, applySidecar, buildSidecar, defaultLines, defaultSidecarJson } from '../core/sidecar'
+import {
+  LinesConfig,
+  applySidecar,
+  buildSidecar,
+  defaultLines,
+  defaultSidecarJson,
+  lineFamilies,
+} from '../core/sidecar'
 import { TopdownManifest, meshFootprint, resolveMeshDir } from '../core/mesh'
 import * as api from '../api'
 
@@ -54,7 +60,10 @@ interface Snapshot {
   objects: Objects
   order: string[]
   tag: Tag
+  pool: PoolDef
   lines: LinesConfig
+  linesByPool: Record<string, LinesConfig>
+  tagsByPool: State['tagsByPool']
   selected: string | null
 }
 
@@ -63,9 +72,15 @@ export interface State {
   order: string[]
   mapPoses: Record<string, Pose4>
   tag: Tag
+  /** the venue being laid out (dimensions + line defaults) */
+  pool: PoolDef
   /** the inactive origin mode's last pose — Tag and Robot each keep their own */
   savedTags: Partial<Record<OriginMode, Tag>>
   lines: LinesConfig
+  /** other visited pools' line edits, restored when switching back (saved in the sidecar) */
+  linesByPool: Record<string, LinesConfig>
+  /** other visited pools' origin placement, restored when switching back (session-only) */
+  tagsByPool: Record<string, { tag: Tag; savedTags: Partial<Record<OriginMode, Tag>> }>
   selected: string | null
   /** legacy: true while placing (kept for the canvas); mirrors placeMode != null */
   tagMode: boolean
@@ -111,6 +126,9 @@ export interface State {
   setRightOpen: (open: boolean) => void
   setShowPoseCols: (on: boolean) => void
 
+  // pool / venue
+  setPool: (id: string) => void
+
   // origin (AprilTag or robot frame)
   placeTagAtWorld: (wx: number, wy: number) => boolean
   placeOriginFree: (wx: number, wy: number) => void
@@ -125,7 +143,7 @@ export interface State {
   swapClass: (a: string, b: string) => void
 
   // lines / view options
-  setLines: (patch: Partial<LinesConfig>) => void
+  setLines: (patch: Partial<LinesConfig>, undoKey?: string) => void
 
   // objects
   addObject: (parent?: string) => string
@@ -149,8 +167,8 @@ export interface State {
   say: (text: string, kind?: 'info' | 'error') => void
 }
 
-function defaultTag(): Tag {
-  return { x: 0, y: POOL_WIDTH_M / 2, basePhi: 0, wall: 'W', yawOffset: 0, mode: 'apriltag' }
+function defaultTag(pool: PoolDef): Tag {
+  return { x: 0, y: pool.widthM / 2, basePhi: 0, wall: 'W', yawOffset: 0, mode: 'apriltag' }
 }
 
 const LS = {
@@ -209,14 +227,20 @@ export const useStore = create<State>()((set, get) => {
   let pendingGesture: Snapshot | null = null
   let lastKey: string | null = null
   let lastAt = 0
-  /** state refs as of the last load/save — undoing back to them clears dirty */
-  let baseline: Omit<Snapshot, 'selected'> | null = null
+  /** state as of the last load/save — matching it again clears dirty */
+  let baseline: Pick<
+    State,
+    'objects' | 'order' | 'tag' | 'pool' | 'lines' | 'linesByPool' | 'tagsByPool'
+  > | null = null
 
   const snapshot = (s: State): Snapshot => ({
     objects: s.objects,
     order: s.order,
     tag: s.tag,
+    pool: s.pool,
     lines: s.lines,
+    linesByPool: s.linesByPool,
+    tagsByPool: s.tagsByPool,
     selected: s.selected,
   })
 
@@ -245,23 +269,69 @@ export const useStore = create<State>()((set, get) => {
     set({ past: [...s.past, snapshot(s)].slice(-HISTORY_MAX), future: [] })
   }
 
+  const deepEq = (a: unknown, b: unknown): boolean => {
+    if (a === b) return true
+    if (typeof a !== 'object' || typeof b !== 'object' || !a || !b) return false
+    if (Array.isArray(a) !== Array.isArray(b)) return false
+    const ka = Object.keys(a)
+    if (ka.length !== Object.keys(b).length) return false
+    return ka.every((k) => deepEq((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]))
+  }
+
+  // Per-pool layout state (lines + origin) compares as content, pool by pool:
+  // the active pool's values live in `lines`/`tag`, stashed pools live in the
+  // *ByPool maps, and a pool with no entry means "that pool's defaults". Which
+  // venue is currently being *viewed* is deliberately not part of the check,
+  // so swapping pools without editing anything never reads as a modification.
+  type LayoutState = Pick<State, 'pool' | 'lines' | 'linesByPool' | 'tag' | 'tagsByPool'>
+  const sameLayouts = (a: LayoutState, b: LayoutState): boolean => {
+    const ids = new Set([
+      a.pool.id,
+      b.pool.id,
+      ...Object.keys(a.linesByPool),
+      ...Object.keys(b.linesByPool),
+      ...Object.keys(a.tagsByPool),
+      ...Object.keys(b.tagsByPool),
+    ])
+    for (const id of ids) {
+      const p = poolById(id)
+      if (p.id !== id) continue // unknown venue id — nothing renders it
+      const linesOf = (x: LayoutState): LinesConfig =>
+        (x.pool.id === id ? x.lines : x.linesByPool[id]) ?? defaultLines(p)
+      const tagOf = (x: LayoutState): Tag =>
+        (x.pool.id === id ? x.tag : x.tagsByPool[id]?.tag) ?? defaultTag(p)
+      if (!deepEq(linesOf(a), linesOf(b)) || !deepEq(tagOf(a), tagOf(b))) return false
+    }
+    return true
+  }
+
   const atBaseline = (s: State): boolean =>
     !!baseline &&
     baseline.objects === s.objects &&
     baseline.order === s.order &&
-    baseline.tag === s.tag &&
-    baseline.lines === s.lines
+    sameLayouts(baseline, s)
 
   const markClean = (): void => {
     const s = get()
-    baseline = { objects: s.objects, order: s.order, tag: s.tag, lines: s.lines }
+    baseline = {
+      objects: s.objects,
+      order: s.order,
+      tag: s.tag,
+      pool: s.pool,
+      lines: s.lines,
+      linesByPool: s.linesByPool,
+      tagsByPool: s.tagsByPool,
+    }
   }
 
   const restore = (snap: Snapshot): Partial<State> => ({
     objects: snap.objects,
     order: snap.order,
     tag: snap.tag,
+    pool: snap.pool,
     lines: snap.lines,
+    linesByPool: snap.linesByPool,
+    tagsByPool: snap.tagsByPool,
     mapPoses: computeMapPoses(snap.objects, snap.order),
     selected: snap.selected && snap.objects[snap.selected] ? snap.selected : null,
   })
@@ -305,9 +375,12 @@ export const useStore = create<State>()((set, get) => {
     objects: {},
     order: [],
     mapPoses: {},
-    tag: defaultTag(),
+    tag: defaultTag(DEFAULT_POOL),
+    pool: DEFAULT_POOL,
     savedTags: {},
-    lines: defaultLines(),
+    lines: defaultLines(DEFAULT_POOL),
+    linesByPool: {},
+    tagsByPool: {},
     selected: null,
     tagMode: false,
     placeMode: null,
@@ -396,19 +469,38 @@ export const useStore = create<State>()((set, get) => {
       set({ showPoseCols: on })
     },
 
+    setPool: (id) => {
+      const s = get()
+      const pool = poolById(id)
+      if (pool.id === s.pool.id) return
+      record()
+      // per-pool state (lines, origin placement) is stashed on the way out and
+      // restored when returning; a first visit gets the pool's defaults.
+      // Objects keep their map-relative poses and ride along with the tag.
+      const back = s.tagsByPool[pool.id]
+      set({
+        pool,
+        lines: s.linesByPool[pool.id] ?? defaultLines(pool),
+        linesByPool: { ...s.linesByPool, [s.pool.id]: s.lines },
+        tag: back?.tag ?? defaultTag(pool),
+        savedTags: back?.savedTags ?? {},
+        tagsByPool: { ...s.tagsByPool, [s.pool.id]: { tag: s.tag, savedTags: s.savedTags } },
+        tagMode: false,
+        placeMode: null,
+      })
+      // swapping venues only dirties if the result actually differs from the
+      // last save (swapping away and straight back stays clean)
+      set({ dirty: !atBaseline(get()) })
+      get().say(`Pool: ${pool.label} — ${pool.lengthM.toFixed(2)} × ${pool.widthM.toFixed(2)} m.`)
+    },
+
     placeTagAtWorld: (wx, wy) => {
       const s = get()
-      const cands = tagCandidates(
-        s.lines.shortShow,
-        s.lines.shortCount,
-        s.lines.shortSpacing,
-        s.lines.longShow,
-        s.lines.longCount,
-        s.lines.longSpacing,
-      )
+      const fam = lineFamilies(s.lines)
+      const cands = tagCandidates(s.pool, fam.short, fam.long, s.lines.extras)
       const c = nearestCandidate(cands, wx, wy, 3.0)
       if (!c) {
-        get().say('No bottom-line / wall intersection within 3 m of that click.', 'error')
+        get().say('No bottom-line / wall intersection or pool corner within 3 m of that click.', 'error')
         return false
       }
       record()
@@ -450,7 +542,7 @@ export const useStore = create<State>()((set, get) => {
         s.savedTags[mode] ??
         (mode === 'robot'
           ? { ...t, mode, basePhi: 0, yawOffset: normDeg(t.basePhi + t.yawOffset) }
-          : defaultTag())
+          : defaultTag(s.pool))
       // a mode switch swaps which origin is active — it must never move the
       // scene, so re-express every map root under the restored frame
       // (children ride on their parents) regardless of poolLock
@@ -525,8 +617,8 @@ export const useStore = create<State>()((set, get) => {
       get().say(`Swapped classes: ${a} ↔ ${b} (${pb.cls ?? '—'} / ${pa.cls ?? '—'}).`)
     },
 
-    setLines: (patch) => {
-      record(`lines:${Object.keys(patch).join()}`)
+    setLines: (patch, undoKey) => {
+      record(undoKey ?? `lines:${Object.keys(patch).join()}`)
       set({ lines: { ...get().lines, ...patch }, dirty: true })
     },
 
@@ -534,7 +626,7 @@ export const useStore = create<State>()((set, get) => {
       record()
       const s = get()
       const name = uniqueName(s.objects, 'prop')
-      const [mx, my, myaw] = worldToMap(POOL_LENGTH_M / 2, POOL_WIDTH_M / 2, 0, s.tag)
+      const [mx, my, myaw] = worldToMap(s.pool.lengthM / 2, s.pool.widthM / 2, 0, s.tag)
       let pose: Pose4 = [mx, my, 0, myaw]
       let par = MAP
       if (parent && s.objects[parent]) {
@@ -730,7 +822,7 @@ export const useStore = create<State>()((set, get) => {
           LS.remove(LAST_CONFIG)
         }
       }
-      commit({}, [], {}, false)
+      commit({}, [], { linesByPool: {}, tagsByPool: {} }, false)
       set({ dirty: false, past: [], future: [] })
       markClean()
       get().say(
@@ -750,23 +842,39 @@ export const useStore = create<State>()((set, get) => {
           objects[p.name] = p
           order.push(p.name)
         }
-        let tag = defaultTag()
-        let lines = defaultLines()
+        let pool = DEFAULT_POOL
+        let tag: Tag | null = null
+        let lines: Partial<LinesConfig> = {}
+        let linesByPool: Record<string, LinesConfig> = {}
+        let tagsByPool: State['tagsByPool'] = {}
         let finalObjects = objects
         try {
           // no saved viz state for this config yet → bundled first-run defaults
           const vizJson = (await api.readViz(path).catch(() => null)) ?? defaultSidecarJson()
           const applied = applySidecar(vizJson, objects, get().manifest)
           finalObjects = applied.objects
-          if (applied.tag) tag = applied.tag
-          lines = { ...lines, ...applied.lines }
+          if (applied.pool) pool = applied.pool
+          // the per-pool maps (when present) are the source of truth; the flat
+          // `apriltag`/`lines` blocks are the legacy single-pool fallback
+          tag = applied.tagsByPool[pool.id] ?? applied.tag
+          lines = applied.linesByPool[pool.id] ?? applied.lines
+          for (const [id, partial] of Object.entries(applied.linesByPool)) {
+            const p = poolById(id)
+            if (p.id === id) linesByPool[id] = { ...defaultLines(p), ...partial }
+          }
+          for (const [id, t] of Object.entries(applied.tagsByPool)) {
+            if (poolById(id).id === id) tagsByPool[id] = { tag: t, savedTags: {} }
+          }
         } catch {
           /* malformed viz state — keep the config as loaded */
         }
         commit(finalObjects, order, {
-          tag,
+          tag: tag ?? defaultTag(pool),
+          pool,
           savedTags: {},
-          lines,
+          lines: { ...defaultLines(pool), ...lines },
+          linesByPool,
+          tagsByPool,
           configPath: path,
           session: { text, ns, loadedNames },
           selected: null,
@@ -797,7 +905,19 @@ export const useStore = create<State>()((set, get) => {
         markClean()
         LS.set(LAST_CONFIG, path)
         try {
-          await api.writeViz(path, buildSidecar(s.objects, s.order, s.tag, s.lines, s.home))
+          await api.writeViz(
+            path,
+            buildSidecar(
+              s.objects,
+              s.order,
+              s.tag,
+              s.lines,
+              s.home,
+              s.pool,
+              s.linesByPool,
+              Object.fromEntries(Object.entries(s.tagsByPool).map(([id, v]) => [id, v.tag])),
+            ),
+          )
         } catch {
           /* viz state is best-effort; never block a config save on it */
         }

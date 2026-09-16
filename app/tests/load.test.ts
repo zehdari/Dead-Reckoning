@@ -53,3 +53,64 @@ describe('loadFromPath viz state', () => {
     expect(s.lines.shortCount).toBe(3)
   })
 })
+
+describe('dirty tracking across pool swaps', () => {
+  it('swapping pools without editing never dirties', async () => {
+    await st().loadFromPath('/tmp/anywhere/config.yaml')
+    expect(st().dirty).toBe(false)
+    const homeTag = st().tag
+
+    st().setPool('rpac-divewell')
+    expect(st().dirty).toBe(false) // viewing another venue is not a modification
+    st().setPool('woollett')
+    expect(st().dirty).toBe(false)
+    expect(st().tag).toEqual(homeTag) // origin placement survived the trip
+
+    // a real edit made while visiting dirties and stays dirty after swapping
+    st().setPool('rpac-divewell')
+    st().setLines({ shortAnchor: 4.5 })
+    expect(st().dirty).toBe(true)
+    st().setPool('woollett')
+    expect(st().dirty).toBe(true)
+    st().undo() // back onto RPAC, anchor edit still applied
+    expect(st().dirty).toBe(true)
+    st().undo() // revert the anchor edit -> everything matches the load again
+    expect(st().dirty).toBe(false)
+  })
+
+  it('the user repro: save on both pools, swap back and forth — stays clean', async () => {
+    await st().loadFromPath('/tmp/anywhere/config.yaml')
+    st().setPool('rpac-divewell')
+    await st().saveToPath('/tmp/anywhere/config.yaml')
+    expect(st().dirty).toBe(false)
+    st().setPool('woollett')
+    expect(st().dirty).toBe(false)
+    st().setPool('rpac-divewell')
+    expect(st().dirty).toBe(false)
+  })
+
+  it('moving the origin dirties; per-pool tags round-trip through the sidecar', async () => {
+    await st().loadFromPath('/tmp/anywhere/config.yaml')
+    st().setOriginPos(5, 5)
+    expect(st().dirty).toBe(true)
+    st().setPool('rpac-divewell')
+    expect(st().dirty).toBe(true) // the woollett origin edit is still unsaved
+    await st().saveToPath('/tmp/anywhere/config.yaml')
+    expect(st().dirty).toBe(false)
+
+    // the save recorded both pools' origins — reload lands on RPAC and the
+    // woollett placement comes back when swapping to it
+    const api = await import('../src/api')
+    const written = vi.mocked(api.writeViz).mock.calls.at(-1)?.[1]
+    expect(written).toBeTruthy()
+    const raw = JSON.parse(written!)
+    expect(Object.keys(raw.apriltag_by_pool).sort()).toEqual(['rpac-divewell', 'woollett'])
+    vizState = written!
+    await st().loadFromPath('/tmp/anywhere/config.yaml')
+    expect(st().pool.id).toBe('rpac-divewell')
+    expect(st().dirty).toBe(false)
+    st().setPool('woollett')
+    expect(st().tag).toMatchObject({ x: 5, y: 5 })
+    expect(st().dirty).toBe(false)
+  })
+})

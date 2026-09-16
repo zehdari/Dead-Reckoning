@@ -12,6 +12,7 @@ import {
   uniqueName,
 } from '../src/core/model'
 import { TopdownManifest, resolveMeshDir } from '../src/core/mesh'
+import { DEFAULT_POOL, poolById } from '../src/core/pools'
 import { applySidecar, buildSidecar, defaultLines, defaultSidecarJson } from '../src/core/sidecar'
 
 function scene(): { objects: Objects; order: string[] } {
@@ -154,8 +155,8 @@ describe('sidecar', () => {
     const { objects, order } = scene()
     objects.a = { ...objects.a, locked: true, hidden: true, color: '#123456', mesh: 'gate', bbox: [0, 1, -1, 1] }
     const tag: Tag = { x: 50, y: 4.5, basePhi: 180, wall: 'E', yawOffset: -5, mode: 'apriltag' }
-    const lines = { ...defaultLines(), shortCount: 15, showGrid: true }
-    const json = buildSidecar(objects, order, tag, lines, '/home/ubuntu')
+    const lines = { ...defaultLines(DEFAULT_POOL), shortCount: 15, showGrid: true }
+    const json = buildSidecar(objects, order, tag, lines, '/home/ubuntu', DEFAULT_POOL)
     expect(JSON.parse(json).props.a.image_path).toBe(
       '/home/ubuntu/.cache/dead_reckoning/topdown/gate.png',
     )
@@ -172,6 +173,158 @@ describe('sidecar', () => {
     expect(applied.tag).toEqual(tag)
     expect(applied.lines.shortCount).toBe(15)
     expect(applied.lines.showGrid).toBe(true)
+    expect(applied.pool?.id).toBe(DEFAULT_POOL.id)
+  })
+
+  it('round-trips anchors, per-line runs, per-family tees and crossCut', () => {
+    const { objects, order } = scene()
+    const tag: Tag = { x: 0, y: 8.5, basePhi: 0, wall: 'W', yawOffset: 0, mode: 'apriltag' }
+    const lines = {
+      ...defaultLines(DEFAULT_POOL),
+      shortAnchor: 4.2672,
+      shortRuns: [{ start: 1, length: 10 }, null, { start: 2, length: 8 }],
+      shortTee: false,
+      longTee: true,
+      crossCut: false,
+    }
+    const json = buildSidecar(objects, order, tag, lines, null, DEFAULT_POOL)
+    const raw = JSON.parse(json).lines
+    expect(raw.short_anchor).toBeCloseTo(4.2672, 9)
+    expect(raw.short_runs).toEqual([{ start: 1, length: 10 }, null, { start: 2, length: 8 }])
+    expect(raw.short_tee_show).toBe(false)
+    expect(raw.long_tee_show).toBe(true)
+    expect(raw.cross_cut).toBe(false)
+    // legacy mirror: old readers show tees when any family has them
+    expect(raw.tee_show).toBe(true)
+
+    const applied = applySidecar(json, scene().objects, {})
+    const merged = { ...defaultLines(DEFAULT_POOL), ...applied.lines }
+    expect(merged.shortAnchor).toBeCloseTo(4.2672, 9)
+    expect(merged.shortRuns).toEqual([{ start: 1, length: 10 }, null, { start: 2, length: 8 }])
+    expect(merged.longAnchor).toBeNull()
+    expect(merged.shortTee).toBe(false)
+    expect(merged.longTee).toBe(true)
+    expect(merged.crossCut).toBe(false)
+  })
+
+  it('round-trips per-pool line layouts (lines_by_pool)', () => {
+    const { objects, order } = scene()
+    const tag: Tag = { x: 0, y: 8.5, basePhi: 0, wall: 'W', yawOffset: 0, mode: 'apriltag' }
+    const rpac = poolById('rpac-divewell')
+    const rpacLines = { ...defaultLines(rpac), shortAnchor: 4.5, shortCount: 3 }
+    const woolLines = { ...defaultLines(DEFAULT_POOL), longCount: 9 }
+    // active pool = RPAC; Woollett edits ride along in linesByPool
+    const json = buildSidecar(objects, order, tag, rpacLines, null, rpac, { woollett: woolLines })
+    const raw = JSON.parse(json)
+    expect(Object.keys(raw.lines_by_pool).sort()).toEqual(['rpac-divewell', 'woollett'])
+    // legacy flat block mirrors the active pool
+    expect(raw.lines.short_count).toBe(3)
+    expect(raw.lines_by_pool['rpac-divewell'].short_anchor).toBe(4.5)
+    expect(raw.lines_by_pool.woollett.long_count).toBe(9)
+
+    const applied = applySidecar(json, scene().objects, {})
+    expect(applied.pool?.id).toBe('rpac-divewell')
+    expect(applied.linesByPool['rpac-divewell'].shortAnchor).toBe(4.5)
+    expect(applied.linesByPool.woollett.longCount).toBe(9)
+  })
+
+  it('sidecars without lines_by_pool yield an empty per-pool map', () => {
+    const json = JSON.stringify({ props: {}, apriltag: null, lines: { short_show: true, short_count: 17, short_spacing: 2.7432, long_show: true, long_count: 8, long_spacing: 2.7432, show_grid: false, show_children: true } })
+    const applied = applySidecar(json, {}, {})
+    expect(applied.linesByPool).toEqual({})
+    expect(applied.lines.shortCount).toBe(17)
+  })
+
+  it('legacy sidecar lines fall back to today\'s behavior', () => {
+    const legacy = (extra: object) =>
+      JSON.stringify({
+        props: {},
+        apriltag: null,
+        lines: {
+          short_show: true,
+          short_count: 17,
+          short_spacing: 2.7432,
+          long_show: true,
+          long_count: 8,
+          long_spacing: 2.7432,
+          show_grid: false,
+          show_children: true,
+          ...extra,
+        },
+      })
+    const merged = (extra: object) => ({
+      ...defaultLines(DEFAULT_POOL),
+      ...applySidecar(legacy(extra), {}, {}).lines,
+    })
+    // no new fields: centered, no overrides, cutting on, tees from pool default
+    const m = merged({})
+    expect(m.shortAnchor).toBeNull()
+    expect(m.longAnchor).toBeNull()
+    expect(m.shortRuns).toEqual([])
+    expect(m.longRuns).toEqual([])
+    expect(m.crossCut).toBe(true)
+    expect(m.shortTee).toBe(true)
+    expect(m.longTee).toBe(true)
+    // legacy shared tee_show drives both families
+    const off = merged({ tee_show: false })
+    expect(off.shortTee).toBe(false)
+    expect(off.longTee).toBe(false)
+  })
+
+  it('round-trips extra lines, including an emptied list', () => {
+    const { objects, order } = scene()
+    const tag: Tag = { x: 0, y: 8.5, basePhi: 0, wall: 'W', yawOffset: 0, mode: 'apriltag' }
+    const rpac = poolById('rpac-divewell')
+    const extras = [
+      { dir: 'along' as const, pos: 2.4, start: 1.5, length: 8.0, tee: false },
+      { dir: 'across' as const, pos: 20.0, start: 3.0, length: 10.0, tee: true },
+    ]
+    const lines = { ...defaultLines(rpac), extras }
+    const applied = applySidecar(buildSidecar(objects, order, tag, lines, null, rpac), scene().objects, {})
+    expect({ ...defaultLines(rpac), ...applied.lines }.extras).toEqual(extras)
+
+    // deleting every extra must survive the round trip (not fall back to pool defaults)
+    const cleared = { ...defaultLines(rpac), extras: [] }
+    const applied2 = applySidecar(buildSidecar(objects, order, tag, cleared, null, rpac), scene().objects, {})
+    expect(applied2.lines.extras).toEqual([])
+    expect({ ...defaultLines(rpac), ...applied2.lines }.extras).toEqual([])
+  })
+
+  it('rpac-divewell defaults carry the measured layout', () => {
+    const pool = poolById('rpac-divewell')
+    expect(pool.lengthM).toBe(25)
+    expect(pool.widthM).toBe(17)
+    const ln = defaultLines(pool)
+    expect(ln.shortCount).toBe(4)
+    expect(ln.shortSpacing).toBeCloseTo(3.81, 6)
+    expect(ln.shortAnchor).toBeCloseTo(4.2672, 6)
+    expect(ln.shortTee).toBe(false)
+    expect(ln.shortRuns).toHaveLength(4)
+    expect(ln.longCount).toBe(6)
+    expect(ln.longSpacing).toBe(3)
+    expect(ln.longAnchor).toBeNull()
+    expect(ln.longTee).toBe(true)
+    expect(ln.crossCut).toBe(false)
+  })
+
+  it('woollett defaults are unchanged by the line-model extension', () => {
+    const ln = defaultLines(DEFAULT_POOL)
+    expect(DEFAULT_POOL.id).toBe('woollett')
+    expect(ln.shortAnchor).toBeNull()
+    expect(ln.longAnchor).toBeNull()
+    expect(ln.shortRuns).toEqual([])
+    expect(ln.longRuns).toEqual([])
+    expect(ln.shortTee).toBe(true)
+    expect(ln.longTee).toBe(true)
+    expect(ln.crossCut).toBe(true)
+  })
+
+  it('defaultLines deep-copies per-line runs from the shared PoolDef', () => {
+    const pool = poolById('rpac-divewell')
+    const a = defaultLines(pool)
+    a.shortRuns[0]!.start = 99
+    const b = defaultLines(pool)
+    expect(b.shortRuns[0]!.start).not.toBe(99)
   })
 
   it('reads prototype sidecars (mesh via image_path, no mesh key)', () => {
@@ -184,6 +337,7 @@ describe('sidecar', () => {
     const applied = applySidecar(json, objects, { bin: { bbox: [0, 1, 0, 1] } })
     expect(applied.objects.a.mesh).toBe('bin')
     expect(applied.tag).toBeNull()
+    expect(applied.pool).toBeNull() // pre-pool sidecars fall back to the default
   })
 
   it('bundled first-run defaults carry the team viz state', () => {

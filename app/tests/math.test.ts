@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_NINE_FT_M,
+  M_PER_FT,
   POOL_LENGTH_M,
   POOL_WIDTH_M,
   Tag,
   centeredPositions,
   compose,
   decompose,
+  linePositions,
   mapToWorld,
   nearestCandidate,
   normDeg,
@@ -118,16 +120,93 @@ describe('lane lines & tag candidates', () => {
     expect(centeredPositions(10, 0, 1)).toEqual([])
   })
 
-  it('candidate count matches the prototype selftest', () => {
-    const cands = tagCandidates(true, 17, DEFAULT_NINE_FT_M, true, 8, DEFAULT_NINE_FT_M)
-    expect(cands.length).toBe((17 + 8) * 2)
+  it('linePositions with no anchor matches centeredPositions', () => {
+    expect(linePositions(50, 17, DEFAULT_NINE_FT_M)).toEqual(centeredPositions(50, 17, DEFAULT_NINE_FT_M))
+    expect(linePositions(50, 17, DEFAULT_NINE_FT_M, null)).toEqual(centeredPositions(50, 17, DEFAULT_NINE_FT_M))
+  })
+
+  it('linePositions anchors the first center (RPAC cross lines)', () => {
+    const pos = linePositions(25, 4, 12.5 * M_PER_FT, 14 * M_PER_FT)
+    expect(pos.length).toBe(4)
+    const expected = [4.2672, 8.0772, 11.8872, 15.6972]
+    pos.forEach((p, i) => expect(p).toBeCloseTo(expected[i], 6))
+  })
+
+  const POOL = { lengthM: POOL_LENGTH_M, widthM: POOL_WIDTH_M }
+  const allCands = () =>
+    tagCandidates(
+      POOL,
+      { show: true, count: 17, spacing: DEFAULT_NINE_FT_M },
+      { show: true, count: 8, spacing: DEFAULT_NINE_FT_M },
+    )
+
+  it('candidate count matches the prototype selftest plus the 4 corners', () => {
+    expect(allCands().length).toBe((17 + 8) * 2 + 4 * 2)
   })
 
   it('snaps to the nearest candidate within 3 m, else null', () => {
-    const cands = tagCandidates(true, 17, DEFAULT_NINE_FT_M, true, 8, DEFAULT_NINE_FT_M)
+    const cands = allCands()
     const c = nearestCandidate(cands, 0.4, POOL_WIDTH_M / 2 + 0.5)
     expect(c).not.toBeNull()
     expect(c!.wall).toBe('W')
     expect(nearestCandidate(cands, 25, 11, 3)).toBeNull() // pool center
+  })
+
+  it('corners are candidates even with all lines hidden', () => {
+    const cands = tagCandidates(
+      POOL,
+      { show: false, count: 17, spacing: DEFAULT_NINE_FT_M },
+      { show: false, count: 8, spacing: DEFAULT_NINE_FT_M },
+    )
+    expect(cands.length).toBe(8) // 4 corners x 2 walls
+    const c = nearestCandidate(cands, 0.5, 0.5)
+    expect(c).toMatchObject({ x: 0, y: 0 })
+  })
+
+  it('extra lines contribute wall candidates on their axis', () => {
+    const rpac = { lengthM: 25, widthM: 17 }
+    const none = { show: false, count: 0, spacing: 1 }
+    const cands = tagCandidates(rpac, none, none, [
+      { dir: 'along', pos: 2.4 },
+      { dir: 'across', pos: 20.0 },
+      { dir: 'along', pos: 99 }, // off-pool -> dropped
+    ])
+    const nonCorner = cands.filter((c) => (c.x !== 0 && c.x !== 25) || (c.y !== 0 && c.y !== 17))
+    expect(nonCorner).toHaveLength(4) // 2 in-pool extras x 2 walls
+    expect(nonCorner.filter((c) => c.y === 2.4).map((c) => c.wall).sort()).toEqual(['E', 'W'])
+    expect(nonCorner.filter((c) => c.x === 20).map((c) => c.wall).sort()).toEqual(['N', 'S'])
+  })
+
+  it('anchored candidates sit at the anchored positions; off-pool ones are dropped', () => {
+    const rpac = { lengthM: 25, widthM: 17 }
+    const cands = tagCandidates(
+      rpac,
+      { show: true, count: 4, spacing: 12.5 * M_PER_FT, anchor: 14 * M_PER_FT },
+      { show: false, count: 6, spacing: 3.0 },
+    )
+    const south = cands.filter((c) => c.wall === 'S' && !(c.x === 0 || c.x === 25))
+    expect(south.map((c) => c.x)).toEqual(
+      [4.2672, 8.0772, 11.8872, 15.6972].map((v) => expect.closeTo(v, 6) as unknown as number),
+    )
+    // an anchor pushing lines past the far wall drops those candidate pairs
+    const far = tagCandidates(
+      rpac,
+      { show: true, count: 4, spacing: 12.5 * M_PER_FT, anchor: 20 },
+      { show: false, count: 6, spacing: 3.0 },
+    )
+    // 20, 23.81 in-pool; 27.62, 31.43 dropped -> 2 lines x 2 walls + 8 corner cands
+    expect(far.length).toBe(2 * 2 + 8)
+  })
+
+  it('a corner click picks the wall the click hugs', () => {
+    const cands = allCands()
+    // near (0,0), tight against the west wall -> tag on W, facing +X
+    expect(nearestCandidate(cands, 0.15, 0.6)).toMatchObject({ x: 0, y: 0, wall: 'W', phi: 0 })
+    // near (0,0), tight against the south wall -> tag on S, facing +Y
+    expect(nearestCandidate(cands, 0.6, 0.15)).toMatchObject({ x: 0, y: 0, wall: 'S', phi: 90 })
+    // far corner, hugging the east wall
+    expect(
+      nearestCandidate(cands, POOL_LENGTH_M - 0.1, POOL_WIDTH_M - 0.3),
+    ).toMatchObject({ x: POOL_LENGTH_M, y: POOL_WIDTH_M, wall: 'E', phi: 180 })
   })
 })

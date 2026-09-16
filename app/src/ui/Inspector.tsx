@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { MAP, mapToWorld } from '../core/math'
+import { ExtraLine, LineRun, MAP, linePositions, mapToWorld } from '../core/math'
+import { POOLS } from '../core/pools'
+import { effectiveRun } from '../core/sidecar'
 import { siblingsOf, useStore, validParents } from '../state/store'
 import { Card, EyeIcon, LockIcon, NumberField, TextField } from './common'
 import { confirmDelete } from './confirm'
@@ -216,6 +218,7 @@ function CovField({ name, k, v }: { name: string; k: 'x' | 'y' | 'z' | 'yaw'; v:
 
 function SceneInspector() {
   const tag = useStore((s) => s.tag)
+  const pool = useStore((s) => s.pool)
   const lines = useStore((s) => s.lines)
   const placeMode = useStore((s) => s.placeMode)
   const labelMode = useStore((s) => s.labelMode)
@@ -227,6 +230,27 @@ function SceneInspector() {
 
   return (
     <>
+      <Card title="Pool">
+        <div className="form-row">
+          <label>venue</label>
+          <select
+            value={pool.id}
+            onChange={(e) => st().setPool(e.target.value)}
+            title="Switching pools resets the bottom lines and map origin to that pool's defaults"
+          >
+            {POOLS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="readout mono">
+          {pool.lengthM.toFixed(2)} × {pool.widthM.toFixed(2)} m · depth {pool.depthM.toFixed(2)} m
+        </div>
+        <div className="muted">{pool.venue}</div>
+      </Card>
+
       <Card title="Map origin">
         <div className="readout mono">
           {robot ? 'robot frame' : `${tag.wall} wall (AprilTag)`} · pool ({tag.x.toFixed(2)}, {tag.y.toFixed(2)})
@@ -274,7 +298,7 @@ function SceneInspector() {
         <div className="muted">
           {robot
             ? 'The map origin is set in the robot frame (placed freely off the wall, shown with the talos footprint). Drag the marker or its handle on the canvas. World↔map math is unchanged.'
-            : 'The map frame is the AprilTag frame (REP-103): +X into the pool, +Y left, +Z up. Snaps to bottom-line / wall intersections. Switch Tag / Robot in the toolbar.'}
+            : 'The map frame is the AprilTag frame (REP-103): +X into the pool, +Y left, +Z up. Snaps to bottom-line / wall intersections and pool corners. Switch Tag / Robot in the toolbar.'}
         </div>
       </Card>
 
@@ -330,23 +354,31 @@ function SceneInspector() {
             <NumberField value={lines.longSpacing} decimals={4} step={0.01} width={80} suffix="m" onCommit={(v) => st().setLines({ longSpacing: Math.max(0.1, v) })} />
             <NumberField value={lines.longThickness} decimals={3} step={0.01} width={64} suffix="m" title="Stripe thickness of the along lines" onCommit={(v) => st().setLines({ longThickness: Math.max(0.02, v) })} />
           </div>
+          <AnchorRows />
           <div className="lines-grid ends">
-            <label className="check" title="T crossbars at line ends, same thickness as the line">
-              <input type="checkbox" checked={lines.teeShow} onChange={(e) => st().setLines({ teeShow: e.target.checked })} />
-              T ends
-            </label>
+            <span />
             <span className="muted">length</span>
             <span className="muted">T length</span>
+            <span className="muted" title="T crossbars at line ends, same thickness as the line">T</span>
             <span>across</span>
-            <NumberField value={lines.shortLength} decimals={3} step={0.1} width={80} suffix="m" title="Run length of the across lines (centered on the pool width)" onCommit={(v) => st().setLines({ shortLength: Math.max(0.2, v) })} />
-            <NumberField value={lines.shortTeeLength} decimals={3} step={0.05} width={64} suffix="m" disabled={!lines.teeShow} title="Length of the T crossbar at each across-line end" onCommit={(v) => st().setLines({ shortTeeLength: Math.max(0.05, v) })} />
+            <NumberField value={lines.shortLength} decimals={3} step={0.1} width={80} suffix="m" title="Default run length of the across lines (centered on the pool width)" onCommit={(v) => st().setLines({ shortLength: Math.max(0.2, v) })} />
+            <NumberField value={lines.shortTeeLength} decimals={3} step={0.05} width={64} suffix="m" disabled={!lines.shortTee} title="Length of the T crossbar at each across-line end" onCommit={(v) => st().setLines({ shortTeeLength: Math.max(0.05, v) })} />
+            <input type="checkbox" checked={lines.shortTee} title="T crossbars at across-line ends" onChange={(e) => st().setLines({ shortTee: e.target.checked })} />
             <span>along</span>
-            <NumberField value={lines.longLength} decimals={3} step={0.1} width={80} suffix="m" title="Run length of the along lines (centered on the pool length)" onCommit={(v) => st().setLines({ longLength: Math.max(0.2, v) })} />
-            <NumberField value={lines.longTeeLength} decimals={3} step={0.05} width={64} suffix="m" disabled={!lines.teeShow} title="Length of the T crossbar at each along-line end" onCommit={(v) => st().setLines({ longTeeLength: Math.max(0.05, v) })} />
-            <span>cut gap</span>
-            <NumberField value={lines.crossGap} decimals={3} step={0.05} width={80} suffix="m" title="Air gap between the cut ends of the along lines and the crossing across lines" onCommit={(v) => st().setLines({ crossGap: Math.max(0, v) })} />
+            <NumberField value={lines.longLength} decimals={3} step={0.1} width={80} suffix="m" title="Default run length of the along lines (centered on the pool length)" onCommit={(v) => st().setLines({ longLength: Math.max(0.2, v) })} />
+            <NumberField value={lines.longTeeLength} decimals={3} step={0.05} width={64} suffix="m" disabled={!lines.longTee} title="Length of the T crossbar at each along-line end" onCommit={(v) => st().setLines({ longTeeLength: Math.max(0.05, v) })} />
+            <input type="checkbox" checked={lines.longTee} title="T crossbars at along-line ends" onChange={(e) => st().setLines({ longTee: e.target.checked })} />
+            <label className="check" title="Cut a window out of the along lines where an across-line stem crosses them">
+              <input type="checkbox" checked={lines.crossCut} onChange={(e) => st().setLines({ crossCut: e.target.checked })} />
+              cut crossings
+            </label>
+            <NumberField value={lines.crossGap} decimals={3} step={0.05} width={80} suffix="m" disabled={!lines.crossCut} title="Air gap between the cut ends of the along lines and the crossing across lines" onCommit={(v) => st().setLines({ crossGap: Math.max(0, v) })} />
+            <span />
             <span />
           </div>
+          <RunsEditor family="short" />
+          <RunsEditor family="long" />
+          <ExtrasEditor />
         </details>
       </Card>
 
@@ -370,5 +402,195 @@ function SceneInspector() {
         </div>
       </Card>
     </>
+  )
+}
+
+/** First-line-position rows for the Bottom-lines card: "auto" = centered. */
+function AnchorRows() {
+  const pool = useStore((s) => s.pool)
+  const lines = useStore((s) => s.lines)
+  const st = () => useStore.getState()
+  const firstOf = (dim: number, count: number, spacing: number, anchor: number | null): number =>
+    linePositions(dim, count, spacing, anchor)[0] ?? 0
+  const firstShort = firstOf(pool.lengthM, lines.shortCount, lines.shortSpacing, lines.shortAnchor)
+  const firstLong = firstOf(pool.widthM, lines.longCount, lines.longSpacing, lines.longAnchor)
+  return (
+    <div className="lines-grid anchors">
+      <span />
+      <span className="muted" title="Center of the first line, measured from the pool origin wall">first line @</span>
+      <span className="muted" title="Center the whole run in the pool">auto</span>
+      <span>across</span>
+      <NumberField
+        value={firstShort}
+        decimals={4}
+        step={0.05}
+        width={80}
+        suffix="m"
+        disabled={lines.shortAnchor === null}
+        title="First across-line center from the x=0 wall"
+        onCommit={(v) => st().setLines({ shortAnchor: v })}
+      />
+      <input
+        type="checkbox"
+        checked={lines.shortAnchor === null}
+        onChange={(e) => st().setLines({ shortAnchor: e.target.checked ? null : firstShort })}
+      />
+      <span>along</span>
+      <NumberField
+        value={firstLong}
+        decimals={4}
+        step={0.05}
+        width={80}
+        suffix="m"
+        disabled={lines.longAnchor === null}
+        title="First along-line center from the y=0 wall"
+        onCommit={(v) => st().setLines({ longAnchor: v })}
+      />
+      <input
+        type="checkbox"
+        checked={lines.longAnchor === null}
+        onChange={(e) => st().setLines({ longAnchor: e.target.checked ? null : firstLong })}
+      />
+    </div>
+  )
+}
+
+/**
+ * Free-form one-off lines outside the two uniform families: add, tune
+ * (direction / center position / run start / run length / T), or delete.
+ * Thickness and T length follow the parallel family's settings.
+ */
+function ExtrasEditor() {
+  const pool = useStore((s) => s.pool)
+  const lines = useStore((s) => s.lines)
+  const st = () => useStore.getState()
+  const update = (i: number, patch: Partial<ExtraLine>): void => {
+    const next = lines.extras.map((e, j) => (j === i ? { ...e, ...patch } : e))
+    st().setLines({ extras: next }, `lines:extras:${i}`)
+  }
+  const remove = (i: number): void => {
+    st().setLines({ extras: lines.extras.filter((_, j) => j !== i) })
+  }
+  const add = (): void => {
+    const e: ExtraLine = {
+      dir: 'along',
+      pos: pool.widthM / 2,
+      start: 2,
+      length: Math.max(pool.lengthM - 4, pool.lengthM / 2),
+      tee: false,
+    }
+    st().setLines({ extras: [...lines.extras, e] })
+  }
+  return (
+    <details className="adv">
+      <summary title="One-off lines outside the two uniform families">
+        extra lines ({lines.extras.length})
+      </summary>
+      {lines.extras.length > 0 && (
+        <div className="lines-grid extras">
+          <span />
+          <span className="muted" title="Center position, m (from the x=0 wall for across, y=0 for along)">pos</span>
+          <span className="muted" title="Run start, m">start</span>
+          <span className="muted" title="Run length, m">length</span>
+          <span className="muted" title="T crossbars at both ends">T</span>
+          <span />
+          {lines.extras.map((e, i) => (
+            <Fragment key={i}>
+              <select
+                value={e.dir}
+                title="across = parallel to the short side; along = parallel to the long side"
+                onChange={(ev) => update(i, { dir: ev.target.value as ExtraLine['dir'] })}
+              >
+                <option value="across">across</option>
+                <option value="along">along</option>
+              </select>
+              <NumberField value={e.pos} decimals={3} step={0.05} width={56} title="Center position, m" onCommit={(v) => update(i, { pos: v })} />
+              <NumberField value={e.start} decimals={3} step={0.1} width={56} title="Run start, m" onCommit={(v) => update(i, { start: Math.max(0, v) })} />
+              <NumberField value={e.length} decimals={3} step={0.1} width={56} title="Run length, m" onCommit={(v) => update(i, { length: Math.max(0, v) })} />
+              <input type="checkbox" checked={e.tee} onChange={(ev) => update(i, { tee: ev.target.checked })} />
+              <button className="icon-btn" title="Delete this line" onClick={() => remove(i)}>
+                ×
+              </button>
+            </Fragment>
+          ))}
+        </div>
+      )}
+      <div className="btn-row">
+        <button onClick={add}>+ add line</button>
+      </div>
+    </details>
+  )
+}
+
+/**
+ * Per-line painted-run editor for one family. Rows show the effective run
+ * (override, or the family default centered run); editing a row stores an
+ * override, × resets it. Overrides are index-keyed, so entries beyond the
+ * family count are simply ignored.
+ */
+function RunsEditor({ family }: { family: 'short' | 'long' }) {
+  const pool = useStore((s) => s.pool)
+  const lines = useStore((s) => s.lines)
+  const st = () => useStore.getState()
+  const isShort = family === 'short'
+  const show = isShort ? lines.shortShow : lines.longShow
+  const count = isShort ? lines.shortCount : lines.longCount
+  const runs = isShort ? lines.shortRuns : lines.longRuns
+  const defLen = isShort ? lines.shortLength : lines.longLength
+  // a line runs perpendicular to the axis its family is spaced along
+  const dim = isShort ? pool.widthM : pool.lengthM
+  if (!show || count <= 0) return null
+  const write = (i: number, run: LineRun | null): void => {
+    const next = [...runs]
+    while (next.length <= i) next.push(null)
+    next[i] = run
+    st().setLines(isShort ? { shortRuns: next } : { longRuns: next }, `lines:${family}Runs:${i}`)
+  }
+  return (
+    <details className="adv">
+      <summary title="Per-line run start/length overrides; rows track line index if the count changes">
+        {isShort ? 'across' : 'along'} runs (per line)
+      </summary>
+      <div className="lines-grid runs">
+        <span />
+        <span className="muted">start</span>
+        <span className="muted">length</span>
+        <span />
+        {Array.from({ length: count }, (_, i) => {
+          const eff = effectiveRun(runs, i, defLen, dim)
+          return (
+            <Fragment key={i}>
+              <span className="muted mono">#{i + 1}</span>
+              <NumberField
+                value={eff.start}
+                decimals={3}
+                step={0.1}
+                width={72}
+                suffix="m"
+                title={`Run start of line #${i + 1}, from the ${isShort ? 'y' : 'x'}=0 wall`}
+                onCommit={(v) => write(i, { ...eff, start: Math.max(0, v) })}
+              />
+              <NumberField
+                value={eff.length}
+                decimals={3}
+                step={0.1}
+                width={72}
+                suffix="m"
+                title={`Run length of line #${i + 1}`}
+                onCommit={(v) => write(i, { ...eff, length: Math.max(0, v) })}
+              />
+              <button
+                className="icon-btn"
+                disabled={!runs[i]}
+                title="Reset to the family default run"
+                onClick={() => write(i, null)}
+              >
+                ×
+              </button>
+            </Fragment>
+          )
+        })}
+      </div>
+    </details>
   )
 }

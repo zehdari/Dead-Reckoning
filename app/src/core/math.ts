@@ -52,11 +52,47 @@ export function normDeg(a: number): number {
   return a === -180.0 ? 180.0 : a
 }
 
-export function centeredPositions(dimensionM: number, count: number, spacingM: number): number[] {
+/** One line's painted run along its axis: start offset and length, m. */
+export interface LineRun {
+  start: number
+  length: number
+}
+
+/**
+ * A free-form bottom line outside the two uniform families — for venues with
+ * odd one-off lines. 'across' runs along Y and is positioned on X (parallel to
+ * the short-family lines); 'along' runs along X and is positioned on Y.
+ * Thickness and T length are inherited from the parallel family.
+ */
+export interface ExtraLine {
+  dir: 'across' | 'along'
+  /** center offset along the positioning axis, m */
+  pos: number
+  /** painted run start along the run axis, m */
+  start: number
+  /** painted run length, m */
+  length: number
+  /** T crossbars at both ends */
+  tee: boolean
+}
+
+/**
+ * Evenly spaced line centers along a dimension. With an anchor, the first
+ * center sits `anchorM` from the 0-wall; otherwise the run is centered.
+ */
+export function linePositions(
+  dimensionM: number,
+  count: number,
+  spacingM: number,
+  anchorM?: number | null,
+): number[] {
   if (count <= 0) return []
-  const span = (count - 1) * spacingM
-  const start = (dimensionM - span) / 2.0
+  const start = anchorM ?? (dimensionM - (count - 1) * spacingM) / 2.0
   return Array.from({ length: count }, (_, i) => start + i * spacingM)
+}
+
+export function centeredPositions(dimensionM: number, count: number, spacingM: number): number[] {
+  return linePositions(dimensionM, count, spacingM)
 }
 
 /** parent map pose ∘ child pose relative to parent -> child map pose (yaw-only rotation, z adds). */
@@ -106,52 +142,87 @@ export interface TagCandidate {
   wall: 'N' | 'S' | 'E' | 'W'
 }
 
+/** Pool extents needed by the placement math (see PoolDef in pools.ts). */
+export interface PoolDims {
+  lengthM: number
+  widthM: number
+}
+
 /**
- * AprilTag candidate points = bottom-line / wall intersections.
- * "short" lines are parallel to the short side (spaced along the length, hit S/N
- * walls); "long" lines are parallel to the long side (spaced along the width,
- * hit W/E walls).
+ * AprilTag candidate points = bottom-line / wall intersections, plus the four
+ * pool corners. "short" lines are parallel to the short side (spaced along the
+ * length, hit S/N walls); "long" lines are parallel to the long side (spaced
+ * along the width, hit W/E walls). Each corner yields two candidates — one per
+ * adjacent wall — so the tag can face into the pool along either; a click near
+ * a corner picks the wall the click hugs (see nearestCandidate).
  */
+export interface TagLineFamily {
+  show: boolean
+  count: number
+  spacing: number
+  /** first line center from the 0-wall; absent/null = centered */
+  anchor?: number | null
+}
+
 export function tagCandidates(
-  shortShow: boolean,
-  shortCount: number,
-  shortSpacing: number,
-  longShow: boolean,
-  longCount: number,
-  longSpacing: number,
+  pool: PoolDims,
+  short: TagLineFamily,
+  long: TagLineFamily,
+  extras: Pick<ExtraLine, 'dir' | 'pos'>[] = [],
 ): TagCandidate[] {
+  const L = pool.lengthM
+  const W = pool.widthM
   const cands: TagCandidate[] = []
-  if (shortShow) {
-    for (const x of centeredPositions(POOL_LENGTH_M, shortCount, shortSpacing)) {
-      if (x >= -0.01 && x <= POOL_LENGTH_M + 0.01) {
-        cands.push({ x, y: 0.0, phi: 90.0, wall: 'S' })
-        cands.push({ x, y: POOL_WIDTH_M, phi: 270.0, wall: 'N' })
-      }
+  const acrossAt = (x: number): void => {
+    if (x >= -0.01 && x <= L + 0.01) {
+      cands.push({ x, y: 0.0, phi: 90.0, wall: 'S' })
+      cands.push({ x, y: W, phi: 270.0, wall: 'N' })
     }
   }
-  if (longShow) {
-    for (const y of centeredPositions(POOL_WIDTH_M, longCount, longSpacing)) {
-      if (y >= -0.01 && y <= POOL_WIDTH_M + 0.01) {
-        cands.push({ x: 0.0, y, phi: 0.0, wall: 'W' })
-        cands.push({ x: POOL_LENGTH_M, y, phi: 180.0, wall: 'E' })
-      }
+  const alongAt = (y: number): void => {
+    if (y >= -0.01 && y <= W + 0.01) {
+      cands.push({ x: 0.0, y, phi: 0.0, wall: 'W' })
+      cands.push({ x: L, y, phi: 180.0, wall: 'E' })
     }
+  }
+  if (short.show) for (const x of linePositions(L, short.count, short.spacing, short.anchor)) acrossAt(x)
+  if (long.show) for (const y of linePositions(W, long.count, long.spacing, long.anchor)) alongAt(y)
+  for (const e of extras) (e.dir === 'across' ? acrossAt : alongAt)(e.pos)
+  // corners exist regardless of which line families are shown
+  for (const [cx, cy] of [
+    [0, 0],
+    [L, 0],
+    [0, W],
+    [L, W],
+  ]) {
+    cands.push({ x: cx, y: cy, phi: cx === 0 ? 0.0 : 180.0, wall: cx === 0 ? 'W' : 'E' })
+    cands.push({ x: cx, y: cy, phi: cy === 0 ? 90.0 : 270.0, wall: cy === 0 ? 'S' : 'N' })
   }
   return cands
 }
 
-/** Nearest candidate to (x, y), or null if all are farther than maxDist. */
+/**
+ * Nearest candidate to (x, y), or null if all are farther than maxDist.
+ * Co-located candidates (the two walls of a pool corner) tie-break by which
+ * wall the click point is closer to.
+ */
 export function nearestCandidate(
   cands: TagCandidate[],
   x: number,
   y: number,
   maxDist = 3.0,
 ): TagCandidate | null {
+  // a candidate sits on its wall, so the click's distance to that wall's plane
+  // is measurable from the candidate itself
+  const wallDist = (c: TagCandidate): number =>
+    c.wall === 'W' || c.wall === 'E' ? Math.abs(x - c.x) : Math.abs(y - c.y)
   let best: TagCandidate | null = null
-  let bestD = maxDist
+  let bestD = Infinity
   for (const c of cands) {
     const d = Math.hypot(c.x - x, c.y - y)
-    if (d <= bestD) {
+    if (d > maxDist) continue
+    const tie = best !== null && Math.abs(d - bestD) < 1e-9
+    if (best === null || d < bestD || (tie && wallDist(c) < wallDist(best))) {
       bestD = d
       best = c
     }

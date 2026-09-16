@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { Tag, mapToWorld } from '../src/core/math'
 import { Objects, computeMapPoses, makeProp } from '../src/core/model'
+import { DEFAULT_POOL } from '../src/core/pools'
+import { defaultLines } from '../src/core/sidecar'
 import { useStore } from '../src/state/store'
 
 const st = () => useStore.getState()
@@ -192,5 +194,38 @@ describe('origin mode switching (separate Tag / Robot poses)', () => {
     expect(st().tag.mode).toBe('robot')
     expect(st().tag.yawOffset).toBe(90)
     expect(st().objects.gate.x).toBe(2)
+  })
+})
+
+describe('per-pool line layouts', () => {
+  beforeEach(() => {
+    useStore.setState({
+      pool: DEFAULT_POOL,
+      lines: defaultLines(DEFAULT_POOL),
+      linesByPool: {},
+    })
+  })
+
+  it('keeps line edits when switching pools and back', () => {
+    st().setLines({ shortCount: 5 })
+    st().setPool('rpac-divewell')
+    // arriving at a fresh pool gets its registry defaults
+    expect(st().lines.shortCount).toBe(4)
+    expect(st().lines.crossCut).toBe(false)
+    // tune RPAC, bounce to Woollett and back
+    st().setLines({ shortRuns: [{ start: 1, length: 9 }, null, null, null], shortAnchor: 4.5 })
+    st().setPool('woollett')
+    expect(st().lines.shortCount).toBe(5) // woollett edit survived
+    st().setPool('rpac-divewell')
+    expect(st().lines.shortAnchor).toBe(4.5)
+    expect(st().lines.shortRuns[0]).toEqual({ start: 1, length: 9 })
+  })
+
+  it('undo of a pool switch restores the previous pool and its lines', () => {
+    st().setLines({ longCount: 3 })
+    st().setPool('rpac-divewell')
+    st().undo()
+    expect(st().pool.id).toBe(DEFAULT_POOL.id)
+    expect(st().lines.longCount).toBe(3)
   })
 })
