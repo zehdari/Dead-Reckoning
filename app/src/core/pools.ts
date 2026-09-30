@@ -89,7 +89,7 @@ export const POOLS: PoolDef[] = [
         { start: 1.7, length: 7.31 },
       ],
       shortTee: false,
-      // 6 lap lanes along the length: centered at 3 m puts centers 1 m off each wall
+      // 7 lap lines along the length: centered at 2.5 m puts centers 1 m off each wall
       longCount: 7,
       longSpacing: 2.5,
       longTee: true,
